@@ -1,0 +1,29 @@
+body {
+  background-color: var(--background-color);
+  color: var(--main-color-dark-theme);
+  height: 100vh;
+}
+
+.welcomepage {
+  width: 100%;
+  height: 100vh;
+}
+.welcomepage__wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+.welcomepage__wrapper-title {
+  font-family: "ArchivoBlack";
+  font-size: 40px;
+  text-transform: uppercase;
+}
+.welcomepage__wrapper-subtitle {
+  transform: scaleY(0.8);
+  font-family: "Roboto Thin";
+  font-size: 24px;
+  text-transform: lowercase;
+  margin-bottom: 20px;
+}/*# sourceMappingURL=WelcomePage.module.css.map */

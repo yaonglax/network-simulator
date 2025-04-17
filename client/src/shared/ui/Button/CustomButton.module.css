@@ -1,0 +1,26 @@
+.customButton {
+  width: 95px;
+  height: 45px;
+  background-color: transparent;
+  color: var(--main-color-dark-theme);
+  border: 1px solid var(--accent-color-purple);
+  border-radius: 0.5rem;
+  font-size: 20px;
+  font-family: "Roboto Thin";
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (hover: hover) {
+  .customButton:hover {
+    background-color: var(--accent-color-purple);
+    transition: background-color 0.2s ease-in;
+  }
+}
+@media (hover: none) {
+  .customButton:active {
+    background-color: var(--accent-color-purple);
+    transition: background-color 0.2s ease-in;
+  }
+}/*# sourceMappingURL=CustomButton.module.css.map */
