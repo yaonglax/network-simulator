@@ -1,5 +1,9 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
-  ping: () => ipcRenderer.invoke("ping"),
+  storage: {
+    get: (key) => ipcRenderer.invoke("storage:get", key),
+    set: (key, value) => ipcRenderer.invoke("storage:set", key, value),
+    remove: (key) => ipcRenderer.invoke("storage:remove", key),
+  },
 });

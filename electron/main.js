@@ -4,12 +4,43 @@ const { setupSocket } = require("./socket");
 const socket = setupSocket();
 const { spawn } = require("child_process");
 const pythonProcess = spawn("python", ["py-backend/ws_server.py"]);
+const Store = require("electron-store").default;
 
 pythonProcess.stdout.on("data", (data) => {
   console.log(`Python: ${data}`);
 });
 
 let mainWindow;
+const store = new Store();
+
+ipcMain.handle("storage:get", (event, key) => {
+  try {
+    return store.get(key);
+  } catch (error) {
+    console.error("Error reading from store:", error);
+    return null;
+  }
+});
+
+ipcMain.handle("storage:set", (event, key, value) => {
+  try {
+    store.set(key, value);
+    return true;
+  } catch (error) {
+    console.error("Error writing to store:", error);
+    return false;
+  }
+});
+
+ipcMain.handle("storage:remove", (event, key) => {
+  try {
+    store.delete(key);
+    return true;
+  } catch (error) {
+    console.error("Error removing from store:", error);
+    return false;
+  }
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({

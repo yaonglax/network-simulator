@@ -3,7 +3,7 @@ import { Port } from "../../types/device.types";
 
 interface HostProps {
     device: HostType;
-    onPortClick: (port: Port) => void;
+    onPortClick?: (port: Port) => void;
 }
 
 const Host = ({ device, onPortClick }: HostProps) => {

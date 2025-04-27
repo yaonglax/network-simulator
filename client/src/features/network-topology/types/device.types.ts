@@ -2,6 +2,7 @@ export type PortType = "trunk" | "access";
 
 export interface Port {
   id: string;
+  deviceId: string;
   name: string;
   type: PortType;
   vlan_id?: number;
