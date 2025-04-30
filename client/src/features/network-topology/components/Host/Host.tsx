@@ -8,7 +8,10 @@ interface HostProps {
 
 const Host = ({ device, onPortClick }: HostProps) => {
     return (
-        <div>{device.name}</div>
+        <>
+            <div>{device.name}</div>
+            <img src={device.icon} alt="host-icon" />
+        </>
     )
 }
 

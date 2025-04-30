@@ -5,6 +5,8 @@ const socket = setupSocket();
 const { spawn } = require("child_process");
 const pythonProcess = spawn("python", ["py-backend/ws_server.py"]);
 const Store = require("electron-store").default;
+const fs = require("fs");
+const { dialog } = require("electron");
 
 pythonProcess.stdout.on("data", (data) => {
   console.log(`Python: ${data}`);
@@ -39,6 +41,46 @@ ipcMain.handle("storage:remove", (event, key) => {
   } catch (error) {
     console.error("Error removing from store:", error);
     return false;
+  }
+});
+
+ipcMain.handle("storage:saveToFile", async (event, data) => {
+  try {
+    const { filePath } = await dialog.showSaveDialog({
+      title: "Save Network Topology",
+      defaultPath: path.join(
+        app.getPath("documents"),
+        `network_topology_${Date.now()}.json`
+      ),
+      filters: [{ name: "JSON Files", extensions: ["json"] }],
+    });
+
+    if (filePath) {
+      fs.writeFileSync(filePath, data);
+      return filePath;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error saving file:", error);
+    throw error;
+  }
+});
+
+ipcMain.handle("storage:loadFromFile", async () => {
+  try {
+    const { filePaths } = await dialog.showOpenDialog({
+      title: "Load Network Topology",
+      filters: [{ name: "JSON Files", extensions: ["json"] }],
+      properties: ["openFile"],
+    });
+
+    if (filePaths?.length > 0) {
+      return fs.readFileSync(filePaths[0], "utf-8");
+    }
+    return null;
+  } catch (error) {
+    console.error("Error loading file:", error);
+    throw error;
   }
 });
 

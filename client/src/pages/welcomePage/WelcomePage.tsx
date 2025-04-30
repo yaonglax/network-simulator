@@ -1,6 +1,6 @@
 import { TypeAnimation } from 'react-type-animation';
 import './WelcomePage.module.css'
-import CustomButton from '@/shared/ui/Button/CustomButton';
+import { CustomButton } from '@/shared/ui';
 import { Link } from 'react-router-dom';
 
 const WelcomePage = () => {

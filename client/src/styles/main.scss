@@ -4,6 +4,7 @@
 @import "../pages/welcomePage/WelcomePage.module.scss",
   "../pages/networkEditorPage/NetworkEditorPage.modules.scss";
 
-@import "../shared/ui/Button/CustomButton.module.scss";
+@import "../shared/ui/Button/CustomButton.module.scss",
+  "../shared/ui/ModalWindow/ModalWindow.module.scss";
 
 @import "../features/network-topology/components/Host/Host";
