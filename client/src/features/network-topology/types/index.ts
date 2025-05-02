@@ -6,6 +6,6 @@ export type {
   Port,
   DeviceType,
   DeviceBase,
+  PortType,
 } from "./device.types";
 export { Connection } from "./network.types";
-export { createHost } from "./device.types";

@@ -1,9 +1,12 @@
 import React from 'react';
 import { Box, Typography, Paper } from '@mui/material';
-import { HostIcon } from '@/assets/entities/Icons';
+import { HostIcon, SwitchIcon, RouterIcon } from '@/assets/entities/Icons';
 
 const DEVICES = [
-  { type: 'Host', icon: <HostIcon />, label: 'Компьютер' }
+  { type: 'Host', icon: <HostIcon />, label: 'Компьютер' },
+  { type: 'Switch', icon: <SwitchIcon />, label: 'Коммутатор' },
+  { type: 'Router', icon: <RouterIcon />, label: 'Маршуртизатор' }
+
 ]
 
 export const DevicesPanel = () => {

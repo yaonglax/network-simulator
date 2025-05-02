@@ -10,10 +10,19 @@ const ICON_MAP = {
     router: <RouterIcon />
 }
 
-export const DeviceEntity = ({ device }: { device: Device }) => {
+interface DeviceEntityProps {
+    device: Device,
+    onContextMenu: () => void,
+    handlePopoverOpen: (event: React.MouseEvent<HTMLElement>) => void,
+    handlePopoverClose: () => void,
+    onDoubleClick: (e: React.MouseEvent<HTMLElement>) => void,
+}
+
+export const DeviceEntity: React.FC<DeviceEntityProps> = ({ device, onContextMenu, handlePopoverOpen, handlePopoverClose, onDoubleClick }) => {
     const updateDevice = useNetworkStore((state) => state.updateDevice);
     const [isDragging, setIsDragging] = useState(false);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
+
 
     const handleDragStart = (e: React.DragEvent) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -25,6 +34,25 @@ export const DeviceEntity = ({ device }: { device: Device }) => {
         setIsDragging(true);
     };
 
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault()
+        onContextMenu()
+    }
+
+    const handleDoubleClick = (e: React.MouseEvent<HTMLElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onDoubleClick(e);
+    }
+    const handleMouseEnter = (e: React.MouseEvent<HTMLElement>) => {
+        handlePopoverOpen(e);
+    }
+
+    const handleMouseLeave = () => {
+        handlePopoverClose();
+    }
+
+
     const handleDragEnd = (e: React.DragEvent) => {
         const canvas = document.getElementById('network-canvas');
         if (!canvas) return;
@@ -33,18 +61,15 @@ export const DeviceEntity = ({ device }: { device: Device }) => {
         const canvasWidth = canvasRect.width;
         const canvasHeight = canvasRect.height;
 
-        // Рассчитываем новые координаты с учетом границ
         let x = e.clientX - canvasRect.left - offset.x;
         let y = e.clientY - canvasRect.top - offset.y;
 
-        // Границы canvas (можно добавить отступы)
         const padding = 20;
         const minX = padding;
         const minY = padding;
-        const maxX = canvasWidth - padding - 100; // 100 - примерная ширина устройства
-        const maxY = canvasHeight - padding - 100; // 100 - примерная высота устройства
+        const maxX = canvasWidth - padding - 100;
+        const maxY = canvasHeight - padding - 100;
 
-        // Ограничиваем координаты границами
         x = Math.max(minX, Math.min(x, maxX));
         y = Math.max(minY, Math.min(y, maxY));
 
@@ -57,6 +82,10 @@ export const DeviceEntity = ({ device }: { device: Device }) => {
             draggable
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
+            onContextMenu={handleContextMenu}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onDoubleClick={handleDoubleClick}
             sx={{
                 position: 'absolute',
                 left: device.x,

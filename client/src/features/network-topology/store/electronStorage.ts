@@ -1,5 +1,14 @@
 import { PersistStorage, StorageValue } from "zustand/middleware";
-import { ProjectState, NetworkState, NetworkSnapshot } from "./network-store";
+import {
+  ProjectState,
+  NetworkState,
+  NetworkSnapshot,
+  NetworkProject,
+  NetworkFileData,
+  NetworkTopology,
+} from "./network-store";
+import { Device, Port, DeviceType, PortType } from "../types";
+import { Connection } from "../types";
 
 declare global {
   interface Window {
@@ -10,6 +19,34 @@ declare global {
         remove: (key: string) => Promise<void>;
         saveToFile: (data: string, filename?: string) => Promise<string>;
         loadFromFile: () => Promise<string | null>;
+      };
+      focus: {
+        forceFocus: () => void;
+      };
+      backend: {
+        calculateDevice: (data: {
+          type: DeviceType;
+          network: string;
+          portsCount: number;
+          ports: Array<{
+            type: PortType;
+            ip_address?: string;
+            vlan?: number;
+            subnet_mask?: string;
+          }>;
+        }) => Promise<{
+          name?: string;
+          ip?: string;
+          mac?: string;
+          gateway?: string;
+          ports?: Array<{
+            type?: PortType;
+            ip?: string;
+            vlan?: number;
+            subnet_mask?: string;
+          }>;
+        }>;
+        checkConnection: () => Promise<boolean>;
       };
     };
   }
@@ -66,10 +103,33 @@ export const electronStorage: PersistStorage<ProjectState> = {
 };
 
 export const fileStorage = {
-  saveNetworkState: async (state: NetworkSnapshot): Promise<string> => {
+  saveNetworkState: async (data: NetworkFileData): Promise<string> => {
     try {
-      const data = JSON.stringify(state, null, 2);
-      const result = await window.electronAPI?.storage?.saveToFile(data);
+      // Нормализуем данные перед сохранением
+      let normalized: NetworkTopology;
+
+      if ("addDevice" in data) {
+        // Это NetworkState - извлекаем нужные данные
+        normalized = {
+          devices: data.devices,
+          connections: data.connections,
+        };
+      } else if ("id" in data) {
+        // Это NetworkProject - преобразуем devices в Record
+        normalized = {
+          devices: data.devices.reduce((acc, device) => {
+            acc[device.id] = device;
+            return acc;
+          }, {} as Record<string, Device>),
+          connections: data.connections,
+        };
+      } else {
+        // Это уже NetworkTopology
+        normalized = data;
+      }
+
+      const fileData = JSON.stringify(normalized, null, 2);
+      const result = await window.electronAPI?.storage?.saveToFile(fileData);
       if (!result) throw new Error("Не удалось сохранить файл");
       return result;
     } catch (error: unknown) {
@@ -79,29 +139,80 @@ export const fileStorage = {
     }
   },
 
-  loadNetworkState: async (): Promise<NetworkSnapshot | null> => {
+  loadNetworkState: async (): Promise<NetworkSnapshot> => {
     try {
       const data = await window.electronAPI?.storage?.loadFromFile();
-      if (!data) return null;
-
-      if (data.startsWith("<!DOCTYPE html>")) {
-        throw new Error("Сервер вернул HTML вместо данных");
-      }
+      if (!data) throw new Error("Файл не выбран или пуст");
 
       const parsed = JSON.parse(data);
+      console.log("Parsed file content:", parsed);
 
-      if (typeof parsed !== "object" || parsed === null) {
-        throw new Error("Некорректный формат файла");
-      }
+      // 1. Нормализация устройств с явным указанием типа
+      const devices: Record<string, Device> = Array.isArray(parsed.devices)
+        ? parsed.devices.reduce(
+            (acc: Record<string, Device>, device: Device) => {
+              acc[device.id] = device;
+              return acc;
+            },
+            {}
+          )
+        : (parsed.devices as Record<string, Device>) || {};
 
-      if (!("devices" in parsed) || !("connections" in parsed)) {
-        throw new Error("Файл не содержит данных топологии");
-      }
+      // 2. Восстановление соединений из connectedTo с явными типами
+      const connectionsFromPorts: Connection[] = [];
 
-      return parsed as NetworkSnapshot;
+      (Object.values(devices) as Device[]).forEach((device: Device) => {
+        device.ports.forEach((port: Port) => {
+          if (port.connectedTo) {
+            const connectionId = `${device.id}-${port.id}-${port.connectedTo.deviceId}-${port.connectedTo.portId}`;
+
+            connectionsFromPorts.push({
+              id: connectionId,
+              from: {
+                deviceId: device.id,
+                portId: port.id,
+              },
+              to: {
+                deviceId: port.connectedTo.deviceId,
+                portId: port.connectedTo.portId,
+              },
+            });
+          }
+        });
+      });
+
+      // 3. Объединение с существующими соединениями
+      const existingConnections: Connection[] = Array.isArray(
+        parsed.connections
+      )
+        ? (parsed.connections as Connection[])
+        : [];
+
+      const allConnections = [
+        ...existingConnections,
+        ...connectionsFromPorts.filter(
+          (c: Connection) =>
+            !existingConnections.some(
+              (ec: Connection) =>
+                (ec.from.deviceId === c.from.deviceId &&
+                  ec.from.portId === c.from.portId &&
+                  ec.to.deviceId === c.to.deviceId &&
+                  ec.to.portId === c.to.portId) ||
+                (ec.from.deviceId === c.to.deviceId &&
+                  ec.from.portId === c.to.portId &&
+                  ec.to.deviceId === c.from.deviceId &&
+                  ec.to.portId === c.from.portId)
+            )
+        ),
+      ];
+
+      return {
+        devices,
+        connections: allConnections,
+      };
     } catch (error: unknown) {
+      console.error("File load error:", error);
       const err = error instanceof Error ? error : new Error(String(error));
-      console.error("File load error:", err);
       throw new Error(`Ошибка загрузки: ${err.message}`);
     }
   },

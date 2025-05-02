@@ -4,12 +4,27 @@ export interface Port {
   id: string;
   deviceId: string;
   name: string;
-  type: PortType;
-  vlan_id?: number;
-  allowed_vlans?: number[];
-  bandwidth?: number;
-  latency?: number;
+  type?: PortType;
+  ip_address: string; // IP порта
+  subnet_mask: string;
+  connectedTo?: {
+    deviceId: string;
+    portId: string;
+    ip_address: string;
+  };
 }
+
+interface PortConfig {
+  minPorts: number;
+  maxPorts: number;
+  defaultPorts: number;
+}
+
+export const DEVICE_PORT_CONFIG: Record<DeviceType, PortConfig> = {
+  host: { minPorts: 1, maxPorts: 8, defaultPorts: 1 },
+  switch: { minPorts: 4, maxPorts: 48, defaultPorts: 8 },
+  router: { minPorts: 2, maxPorts: 32, defaultPorts: 4 },
+} as const;
 
 export type DeviceType = "router" | "switch" | "host";
 
@@ -49,11 +64,5 @@ export interface Host extends DeviceBase {
   gateway: string;
   icon: string;
 }
-
-export const createHost = (hostData: Omit<Host, "type" | "icon">): Host => ({
-  type: "host",
-  icon: DEFAULT_HOST_ICON,
-  ...hostData,
-});
 
 export type Device = Router | Switch | Host;
