@@ -5,6 +5,7 @@ import './styles/main.css'
 import { useEffect } from 'react';
 
 function App() {
+
   useEffect(() => {
     const handleFocusInputs = () => {
       // Находим первый инпут в модалке или на странице

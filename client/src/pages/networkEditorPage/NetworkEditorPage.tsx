@@ -1,8 +1,7 @@
 import { Box } from '@mui/material'
 import { DevicesPanel } from "@/features/network-topology/components/DevicesPanel/DevicesPanel";
-import { NetworkCanvas } from "@/features/network-topology/components/NetworkCanvas/NetworkCanvas";
-import { SaveLoadControls } from "@/shared/ui";
-
+import { NetworkCanvas } from '@/features/network-topology/components/NetworkCanvas/NetworkCanvas';
+import { SaveLoadControls } from '@/features/network-topology/components';
 const NetworkEditorPage = () => {
 
     return (

@@ -1,17 +1,24 @@
-export type PortType = "trunk" | "access";
+export type PortType = "trunk" | "access" | "none";
 
 export interface Port {
   id: string;
-  deviceId: string;
   name: string;
+  deviceId: string;
   type?: PortType;
-  ip_address: string; // IP порта
-  subnet_mask: string;
+  accessVlan?: number;
+  allowedVlanList?: number[];
+  active: boolean;
+  isVlanEnabled: boolean;
   connectedTo?: {
+    name: string;
     deviceId: string;
     portId: string;
-    ip_address: string;
+    ip_address?: string;
+    subnet_mask?: string;
   };
+  mac_address?: string;
+  ip_address?: string;
+  subnet_mask?: string;
 }
 
 interface PortConfig {
@@ -32,6 +39,8 @@ export interface DeviceBase {
   id: string;
   type: DeviceType;
   name: string;
+  ip_address?: string;
+  mac_address?: string;
   ports: Port[];
   x?: number;
   y?: number;
@@ -45,7 +54,7 @@ export interface RoutingEntry {
 
 export interface Router extends DeviceBase {
   type: "router";
-  routing_table: RoutingEntry[];
+  routing_table: any[];
   icon: "../../../assets/entities/wireless-router.png";
 }
 
@@ -59,7 +68,7 @@ const DEFAULT_HOST_ICON = "src/assets/entities/desktop.png";
 
 export interface Host extends DeviceBase {
   type: "host";
-  ip_address: string;
+
   mac_address: string;
   gateway: string;
   icon: string;

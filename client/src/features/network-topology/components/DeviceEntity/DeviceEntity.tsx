@@ -34,10 +34,11 @@ export const DeviceEntity: React.FC<DeviceEntityProps> = ({ device, onContextMen
         setIsDragging(true);
     };
 
-    const handleContextMenu = (e: React.MouseEvent) => {
-        e.preventDefault()
-        onContextMenu()
-    }
+    const handleContextMenu = (e: React.MouseEvent<HTMLElement>) => {
+        e.preventDefault();
+        onContextMenu();
+        handlePopoverOpen(e);
+    };
 
     const handleDoubleClick = (e: React.MouseEvent<HTMLElement>) => {
         e.preventDefault();
@@ -47,11 +48,6 @@ export const DeviceEntity: React.FC<DeviceEntityProps> = ({ device, onContextMen
     const handleMouseEnter = (e: React.MouseEvent<HTMLElement>) => {
         handlePopoverOpen(e);
     }
-
-    const handleMouseLeave = () => {
-        handlePopoverClose();
-    }
-
 
     const handleDragEnd = (e: React.DragEvent) => {
         const canvas = document.getElementById('network-canvas');
@@ -83,8 +79,6 @@ export const DeviceEntity: React.FC<DeviceEntityProps> = ({ device, onContextMen
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             onContextMenu={handleContextMenu}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
             onDoubleClick={handleDoubleClick}
             sx={{
                 position: 'absolute',

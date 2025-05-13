@@ -1,3 +1,38 @@
+import { DeviceType, PortType } from "../types";
+
+interface DeviceCalculationResponse {
+  status: "success" | "error";
+  data?: {
+    name: string;
+    ip: string;
+    mac: string;
+    gateway: string;
+    ports: Array<{
+      type: PortType;
+      ip_address?: string;
+      vlan?: number;
+      subnet_mask?: string;
+    }>;
+  };
+  message?: string;
+}
+
+interface ElectronBackendAPI {
+  calculateDevice: (data: {
+    type: DeviceType;
+    network: string;
+    portsCount?: number;
+    ports?: Array<{
+      type: PortType;
+      ip_address?: string;
+      vlan?: number;
+      subnet_mask?: string;
+    }>;
+  }) => Promise<DeviceCalculationResponse>;
+
+  checkConnection: () => Promise<boolean>;
+}
+
 interface ElectronStorageAPI {
   get: (key: string) => Promise<string | null>;
   set: (key: string, value: string) => Promise<void>;
@@ -8,22 +43,6 @@ interface ElectronStorageAPI {
 
 interface ElectronFocusAPI {
   forceFocus: () => void;
-}
-
-interface ElectronBackendAPI {
-  calculateDevice: (data: { type: DeviceType; network: string }) => Promise<{
-    name?: string;
-    ip?: string;
-    mac?: string;
-    gateway?: string;
-    ports?: Array<{
-      type?: PortType;
-      ip?: string;
-      vlan?: number;
-      subnet_mask?: string;
-    }>;
-  }>;
-  checkConnection: () => Promise<boolean>;
 }
 
 declare global {

@@ -27,24 +27,31 @@ declare global {
         calculateDevice: (data: {
           type: DeviceType;
           network: string;
-          portsCount: number;
-          ports: Array<{
+          portsCount?: number;
+          name?: string; // Сделали name опциональным
+          ports?: Array<{
             type: PortType;
+            name?: string;
             ip_address?: string;
             vlan?: number;
             subnet_mask?: string;
           }>;
         }) => Promise<{
-          name?: string;
-          ip?: string;
-          mac?: string;
-          gateway?: string;
-          ports?: Array<{
-            type?: PortType;
-            ip?: string;
-            vlan?: number;
-            subnet_mask?: string;
-          }>;
+          status: "success" | "error";
+          data?: {
+            name: string;
+            ip: string;
+            mac: string;
+            gateway: string;
+            ports: Array<{
+              name?: string;
+              type: PortType;
+              ip_address?: string;
+              vlan?: number;
+              subnet_mask?: string;
+            }>;
+          };
+          message?: string;
         }>;
         checkConnection: () => Promise<boolean>;
       };
@@ -117,7 +124,7 @@ export const fileStorage = {
       } else if ("id" in data) {
         // Это NetworkProject - преобразуем devices в Record
         normalized = {
-          devices: data.devices.reduce((acc, device) => {
+          devices: Object.values(data.devices).reduce((acc, device) => {
             acc[device.id] = device;
             return acc;
           }, {} as Record<string, Device>),
@@ -154,7 +161,7 @@ export const fileStorage = {
               acc[device.id] = device;
               return acc;
             },
-            {}
+            {} as Record<string, Device>
           )
         : (parsed.devices as Record<string, Device>) || {};
 
@@ -162,23 +169,29 @@ export const fileStorage = {
       const connectionsFromPorts: Connection[] = [];
 
       (Object.values(devices) as Device[]).forEach((device: Device) => {
-        device.ports.forEach((port: Port) => {
-          if (port.connectedTo) {
-            const connectionId = `${device.id}-${port.id}-${port.connectedTo.deviceId}-${port.connectedTo.portId}`;
-
-            connectionsFromPorts.push({
-              id: connectionId,
-              from: {
-                deviceId: device.id,
-                portId: port.id,
-              },
-              to: {
-                deviceId: port.connectedTo.deviceId,
-                portId: port.connectedTo.portId,
-              },
-            });
-          }
-        });
+        if (device.ports && Array.isArray(device.ports)) {
+          device.ports.forEach((port: Port) => {
+            if (port.connectedTo) {
+              const connectionId = `${device.id}-${port.id}-${port.connectedTo.deviceId}-${port.connectedTo.portId}`;
+              if (
+                port.connectedTo.deviceId === undefined ||
+                port.connectedTo.portId === undefined
+              )
+                return;
+              connectionsFromPorts.push({
+                id: connectionId,
+                from: {
+                  deviceId: device.id,
+                  portId: port.id,
+                },
+                to: {
+                  deviceId: port.connectedTo.deviceId,
+                  portId: port.connectedTo.portId,
+                },
+              });
+            }
+          });
+        }
       });
 
       // 3. Объединение с существующими соединениями
@@ -205,6 +218,16 @@ export const fileStorage = {
             )
         ),
       ];
+
+      // 4. Логирование для проверки имён
+      console.log(
+        "Loaded devices:",
+        Object.values(devices).map((d) => ({
+          id: d.id,
+          name: d.name,
+          ports: d.ports?.map((p) => ({ id: p.id, name: p.name })) || [],
+        }))
+      );
 
       return {
         devices,

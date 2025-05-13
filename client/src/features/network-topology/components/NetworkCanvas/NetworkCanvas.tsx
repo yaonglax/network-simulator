@@ -1,14 +1,14 @@
+
 import React, { useEffect, useMemo, useState } from 'react';
-import { Paper } from '@mui/material';
+import { Paper, Button } from '@mui/material';
 import { useNetworkStore } from '../../store/network-store';
-import { ModalWindow, SaveLoadControls } from '@/shared/ui';
+import ModalWindow from '../ModalWindow/ModalWindow';
 import { DeviceEntity } from '../DeviceEntity/DeviceEntity';
-import { DeviceType, Host, Router, Switch, Device } from '../../types';
-import PortsPopover from '@/shared/ui/PortsPopover/PortsPopover';
-import { fileStorage } from '../../store/electronStorage';
-import PortConnectionModal from '@/shared/ui/PortConnectionModal/PortConnectionModal';
-
-
+import { DeviceType, Host, Router, Switch, Device, Port } from '../../types';
+import PortsPopover from '@/features/network-topology/components/ContextMenuPopover/ContextMenuPopover';
+import PortConnectionModal from '@/features/network-topology/components/PortConnectionModal/PortConnectionModal';
+import PacketEntity from '../PacketEntity/PacketEntity';
+import StartButton from '../StartButton';
 
 export const NetworkCanvas = () => {
 
@@ -17,87 +17,91 @@ export const NetworkCanvas = () => {
         startY: number;
         endX: number;
         endY: number;
+        id: string;
+        stroke: string;
     }
 
-    const [forceUpdate, setForceUpdate] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isPortsModalOpen, setIsPortsModalOpen] = useState(false)
-    const [isPortsConnModalOpen, setIsPortsConnModalOpen] = useState(false)
+    const [isPortsModalOpen, setIsPortsModalOpen] = useState(false);
+    const [isPortsConnModalOpen, setIsPortsConnModalOpen] = useState(false);
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
     const [dropPosition, setDropPosition] = useState({ x: 0, y: 0 });
     const [deviceType, setDeviceType] = useState<DeviceType | null>(null);
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-    const [isDrawingConn, setIsDrawingConn] = useState(false)
-    const [mouseCoord, setMouseCoord] = useState({ mouseX: 0, mouseY: 0 })
-    const [selectedStartDevice, setSelectedStartDevice] = useState<Device | null>(null)
-    const [selectedEndDevice, setSelectedEndDevice] = useState<Device | null>(null)
+    const [isDrawingConn, setIsDrawingConn] = useState(false);
+    const [mouseCoord, setMouseCoord] = useState({ mouseX: 0, mouseY: 0 });
+    const [selectedStartDevice, setSelectedStartDevice] = useState<Device | null>(null);
+    const [selectedEndDevice, setSelectedEndDevice] = useState<Device | null>(null);
+    const [selectedStartPort, setSelectedStartPort] = useState<Port | null>(null);
+    const [selectedEndPort, setSelectedEndPort] = useState<Port | null>(null);
     const [lineCoord, setLineCoord] = useState<LineCoords>({
         startX: 0,
         startY: 0,
         endX: 0,
-        endY: 0
+        endY: 0,
+        id: '',
+        stroke: '#3f51b5',
     });
-    const connections = useNetworkStore((state) => state.connections);
-    const addDevice = useNetworkStore((state) => state.addDevice);
-    const devices = useNetworkStore((state) => state.devices);
     const [deviceRects, setDeviceRects] = useState<Record<string, DOMRect>>({});
-    const storeConnections = useNetworkStore((state) => state.connections);
+
+    // zustand store
+    const devices = useNetworkStore((state) => state.devices);
+    const connections = useNetworkStore((state) => state.connections);
+    const packets = useNetworkStore((state) => state.packets);
+    const activeConnections = useNetworkStore((state) => state.activeConnections);
+    const isSimulationRunning = useNetworkStore((state) => state.isSimulationRunning);
+    const addDevice = useNetworkStore((state) => state.addDevice);
+    const startSimulation = useNetworkStore((state) => state.startSimulation);
+    const clearPackets = useNetworkStore((state) => state.clearPackets);
+
+    const [isPlaying, setIsPlaying] = useState(isSimulationRunning);
+
+    // Уникальные устройства (без дубликатов)
+    const uniqueDevices = useMemo(() => {
+        const seenIds = new Set<string>();
+        return Object.values(devices).filter((device) => {
+            if (seenIds.has(device.id)) {
+                console.warn(`Duplicate device ID found: ${device.id}`);
+                return false;
+            }
+            seenIds.add(device.id);
+            return true;
+        });
+    }, [devices]);
+
+    useEffect(() => {
+        setIsPlaying(isSimulationRunning);
+    }, [isSimulationRunning]);
 
     useEffect(() => {
         const rects: Record<string, DOMRect> = {};
-        Object.values(devices).forEach(device => {
+        uniqueDevices.forEach((device) => {
             const element = document.getElementById(`device-${device.id}`);
             if (element) {
                 rects[device.id] = element.getBoundingClientRect();
             }
         });
         setDeviceRects(rects);
-    }, [devices, forceUpdate]);
+    }, [uniqueDevices]);
 
-
-
+    // Линии соединений
     const connectionLines = useMemo(() => {
-        return connections.map(conn => {
+        return connections.map((conn) => {
             const fromDevice = devices[conn.from.deviceId];
             const toDevice = devices[conn.to.deviceId];
-
-            if (!fromDevice || !toDevice || fromDevice.x === undefined || fromDevice.y === undefined || toDevice.x === undefined || toDevice.y === undefined) return null;
-
+            if (!fromDevice || !toDevice) return null;
+            const isActiveFlood = !!activeConnections[conn.id]?.floodCount;
+            const stroke = isActiveFlood ? 'black' : '#3f51b5';
             return {
                 id: conn.id,
                 startX: fromDevice.x + 25,
                 startY: fromDevice.y + 25,
                 endX: toDevice.x + 25,
-                endY: toDevice.y + 25
+                endY: toDevice.y + 25,
+                stroke,
             };
-        }).filter(Boolean) as Array<LineCoords & { id: string }>;
-    }, [connections, devices]);
-
-    useEffect(() => {
-        const unsubscribe = useNetworkStore.subscribe(
-            (state) => {
-                console.log("Current devices:", Object.values(state.devices));
-                setForceUpdate(prev => !prev);
-            }
-        );
-        return () => unsubscribe();
-    }, []);
-
-
-    useEffect(() => {
-        if (!isDrawingConn) return;
-
-        const handleMouseMove = (e: MouseEvent) => {
-            setLineCoord(prev => ({
-                ...prev,
-                endX: e.clientX,
-                endY: e.clientY
-            }));
-        };
-
-        window.addEventListener('mousemove', handleMouseMove);
-        return () => window.removeEventListener('mousemove', handleMouseMove);
-    }, [isDrawingConn]);
+        }).filter(Boolean) as LineCoords[];
+    }, [connections, devices, activeConnections]);
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
@@ -107,11 +111,10 @@ export const NetworkCanvas = () => {
         const bounds = e.currentTarget.getBoundingClientRect();
         setDropPosition({
             x: e.clientX - bounds.left,
-            y: e.clientY - bounds.top
+            y: e.clientY - bounds.top,
         });
         setDeviceType(type.toLowerCase() as DeviceType);
         setIsModalOpen(true);
-
     };
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -122,7 +125,6 @@ export const NetworkCanvas = () => {
     const handleDeviceContextMenu = (device: Device) => {
         setSelectedDevice(device);
         setIsPortsModalOpen(true);
-
     };
 
     const handlePopoverClose = () => {
@@ -135,8 +137,15 @@ export const NetworkCanvas = () => {
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        setMouseCoord({ mouseX: e.clientX, mouseY: e.clientY })
-    }
+        setMouseCoord({ mouseX: e.clientX, mouseY: e.clientY });
+        if (isDrawingConn) {
+            setLineCoord((prev) => ({
+                ...prev,
+                endX: e.clientX,
+                endY: e.clientY,
+            }));
+        }
+    };
 
     const handleDoubleClick = (e: React.MouseEvent<HTMLElement>, device: Device) => {
         e.preventDefault();
@@ -147,37 +156,56 @@ export const NetworkCanvas = () => {
         const centerY = rect.top + rect.height / 2;
 
         if (!isDrawingConn) {
-            // Первый клик - начало линии
             setSelectedStartDevice(device);
             setIsDrawingConn(true);
             setLineCoord({
                 startX: centerX,
                 startY: centerY,
                 endX: centerX,
-                endY: centerY
+                endY: centerY,
+                id: '',
+                stroke: '#3f51b5',
             });
         } else {
-            // Второй клик - завершение линии
             if (device.id === selectedStartDevice?.id) {
-                // Клик на то же устройство - отмена
                 setIsDrawingConn(false);
                 setSelectedStartDevice(null);
                 return;
             }
 
+            const freePorts = getFreePorts(device.id);
+            if (freePorts.length === 0) {
+                setIsDrawingConn(false);
+                setSelectedStartDevice(null);
+                alert('Все порты заняты!');
+                window.electronAPI?.focus?.forceFocus();
+                return;
+            }
+
+            if (selectedStartDevice?.type === 'host' && device.type === 'host') {
+                setIsDrawingConn(false);
+                setSelectedStartDevice(null);
+                alert('Нельзя соединять два хоста напрямую');
+                window.electronAPI?.focus?.forceFocus();
+                return;
+            }
+
             setSelectedEndDevice(device);
             setIsDrawingConn(false);
-
-            // Сначала открываем модальное окно
             setIsPortsConnModalOpen(true);
 
-            // Затем обновляем линию (но не добавляем в connections пока не подтвердят в модалке)
-            setLineCoord(prev => ({
+            setLineCoord((prev) => ({
                 ...prev,
                 endX: centerX,
-                endY: centerY
+                endY: centerY,
             }));
         }
+    };
+
+    const getFreePorts = (deviceId: string): Port[] => {
+        const device = devices[deviceId];
+        if (!device?.ports) return [];
+        return device.ports.filter((port) => !port.connectedTo);
     };
 
     const handleModalConfirm = (formData: any) => {
@@ -188,7 +216,7 @@ export const NetworkCanvas = () => {
             name: formData.name || `New ${deviceType}`,
             x: dropPosition.x,
             y: dropPosition.y,
-            ports: formData.ports || []
+            ports: formData.ports || [],
         };
 
         switch (deviceType) {
@@ -199,7 +227,7 @@ export const NetworkCanvas = () => {
                     ip_address: formData.ip_address || '192.168.0.1',
                     mac_address: formData.mac_address || 'AA:BB:CC:DD:EE:FF',
                     gateway: formData.gateway || '192.168.0.1',
-                    icon: "src/assets/entities/desktop.png"
+                    icon: 'src/assets/entities/desktop.png',
                 };
                 addDevice(host);
                 break;
@@ -209,7 +237,7 @@ export const NetworkCanvas = () => {
                     ...baseDevice,
                     type: 'router',
                     routing_table: [],
-                    icon: "../../../assets/entities/wireless-router.png"
+                    icon: '../../../assets/entities/wireless-router.png',
                 };
                 addDevice(router);
                 break;
@@ -219,7 +247,7 @@ export const NetworkCanvas = () => {
                     ...baseDevice,
                     type: 'switch',
                     mac_table: {},
-                    icon: "../../../assets/entities/hub.png"
+                    icon: '../../../assets/entities/hub.png',
                 };
                 addDevice(switchDevice);
                 break;
@@ -227,16 +255,15 @@ export const NetworkCanvas = () => {
 
         setIsModalOpen(false);
     };
+
     const handlePortsConnected = () => {
-        if (selectedStartDevice && selectedEndDevice) {
-            // Добавляем соединение в хранилище
+        if (selectedStartDevice && selectedEndDevice && selectedStartPort && selectedEndPort) {
             useNetworkStore.getState().connectPorts(
-                selectedStartDevice.ports[0], // Нужно выбрать конкретный порт
-                selectedEndDevice.ports[0]    // Нужно выбрать конкретный порт
+                selectedStartPort,
+                selectedEndPort
             );
         }
 
-        // Сбрасываем временные состояния
         setIsPortsConnModalOpen(false);
         setSelectedStartDevice(null);
         setSelectedEndDevice(null);
@@ -244,9 +271,21 @@ export const NetworkCanvas = () => {
             startX: 0,
             startY: 0,
             endX: 0,
-            endY: 0
+            endY: 0,
+            id: '',
+            stroke: '#3f51b5',
         });
     };
+
+    const handleToggleSimulation = () => {
+        if (!isPlaying) {
+            setIsPlaying(true);
+            startSimulation();
+        } else {
+            setIsPlaying(false);
+        }
+    };
+
     return (
         <Paper
             id="network-canvas"
@@ -254,7 +293,6 @@ export const NetworkCanvas = () => {
             onDragOver={handleDragOver}
             onContextMenu={(e) => e.preventDefault()}
             onMouseMove={handleMouseMove}
-
             sx={{
                 flexGrow: 1,
                 height: '600px',
@@ -265,8 +303,6 @@ export const NetworkCanvas = () => {
                 zIndex: 1,
             }}
         >
-
-
             <svg
                 style={{
                     position: 'absolute',
@@ -275,39 +311,45 @@ export const NetworkCanvas = () => {
                     width: '100%',
                     height: '100%',
                     pointerEvents: 'none',
-                    zIndex: 1
+                    zIndex: 1,
                 }}
             >
-                {connectionLines.map(conn => (
+                {connectionLines.map((line) => (
                     <line
-                        key={conn.id}
-                        x1={conn.startX}
-                        y1={conn.startY}
-                        x2={conn.endX}
-                        y2={conn.endY}
-                        stroke="#3f51b5"
+                        key={line.id}
+                        x1={line.startX}
+                        y1={line.startY}
+                        x2={line.endX}
+                        y2={line.endY}
+                        stroke={line.stroke}
                         strokeWidth="2"
                     />
                 ))}
             </svg>
 
-            {/* Затем рисуем устройства поверх соединений */}
-            {Object.values(devices).map((device) => (
-                <DeviceEntity key={device.id} device={device} onContextMenu={() => handleDeviceContextMenu(device)} handlePopoverOpen={(e) => handlePopoverOpen(e, device)}
-                    handlePopoverClose={handlePopoverClose} onDoubleClick={(e) => handleDoubleClick(e, device)} />
+            {uniqueDevices.map((device) => (
+                <DeviceEntity
+                    key={device.id}
+                    device={device}
+                    onContextMenu={() => handleDeviceContextMenu(device)}
+                    handlePopoverOpen={(e) => handlePopoverOpen(e, device)}
+                    handlePopoverClose={handlePopoverClose}
+                    onDoubleClick={(e) => handleDoubleClick(e, device)}
+                />
             ))}
 
-            {/* Временная линия соединения (при рисовании) */}
             {isDrawingConn && (
-                <svg style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    width: '100vw',
-                    height: '100vh',
-                    pointerEvents: 'none',
-                    zIndex: 10
-                }}>
+                <svg
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100vw',
+                        height: '100vh',
+                        pointerEvents: 'none',
+                        zIndex: 10,
+                    }}
+                >
                     <line
                         x1={lineCoord.startX}
                         y1={lineCoord.startY}
@@ -320,13 +362,22 @@ export const NetworkCanvas = () => {
                 </svg>
             )}
 
-
+            <StartButton
+                isPlaying={isPlaying}
+                onToggle={handleToggleSimulation}
+            />
+            <Button
+                variant="contained"
+                onClick={() => clearPackets()}
+                sx={{ position: 'absolute', bottom: 60, right: 20, zIndex: 1000 }}
+            >
+                Очистить пакеты
+            </Button>
             <ModalWindow
                 modalOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onSubmit={handleModalConfirm}
                 deviceType={deviceType}
-
             />
             <PortsPopover
                 device={selectedDevice}
@@ -334,17 +385,29 @@ export const NetworkCanvas = () => {
                 anchorEl={anchorEl}
                 setAnchorEl={setAnchorEl}
             />
-
             {selectedStartDevice && selectedEndDevice && (
                 <PortConnectionModal
-                    onClose={() => setIsPortsConnModalOpen(false)}
-                    onConnect={handlePortsConnected}
+                    onClose={() => {
+                        setIsPortsConnModalOpen(false);
+                    }}
+                    onConnect={() => {
+                        handlePortsConnected();
+                    }}
                     open={isPortsConnModalOpen}
                     deviceIdStart={selectedStartDevice.id}
                     deviceIdEnd={selectedEndDevice.id}
                 />
             )}
-
+            {/* Теперь отображаем все пакеты, включая flood */}
+            {Object.values(packets).map((packet) => (
+                <PacketEntity
+                    key={packet.id}
+                    packetId={packet.id}
+                    isPlaying={isPlaying}
+                />
+            ))}
         </Paper>
     );
 };
+
+export default NetworkCanvas;

@@ -7,7 +7,9 @@
     "start": "cross-env NODE_ENV=development concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
     "electron": "electron .",
     "build": "cd client && npm run build",
-    "pack": "npm run build && npm run electron"
+    "pack": "npm run build && npm run electron",
+    "clean:build": "rimraf client/dist",
+    "clean:full": "rimraf client/build node_modules package-lock.json"
   },
   "keywords": [],
   "author": "",
@@ -23,11 +25,20 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.0.2",
     "@mui/material": "^7.0.2",
+    "date-fns": "^4.1.0",
     "electron-store": "^10.0.1",
+    "framer-motion": "^12.9.7",
     "fs": "^0.0.1-security",
+    "react-konva": "^19.0.3",
     "react-type-animation": "^3.2.0",
+    "rimraf": "^6.0.1",
+    "rollup-plugin-visualizer": "^5.14.0",
+    "shallow": "^1.0.0",
     "socket.io-client": "^4.8.1",
-    "zustand": "^5.0.3"
+    "terser": "^5.39.0",
+    "uuid": "^11.1.0",
+    "zustand": "^5.0.4"
   }
 }
