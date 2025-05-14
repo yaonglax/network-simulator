@@ -55,20 +55,19 @@ export interface RoutingEntry {
 export interface Router extends DeviceBase {
   type: "router";
   routing_table: any[];
-  icon: "../../../assets/entities/wireless-router.png";
+  icon: string;
 }
 
 export interface Switch extends DeviceBase {
   type: "switch";
   mac_table: Record<string, string>;
-  icon: "../../../assets/entities/hub.png";
+  icon: string;
 }
 
 const DEFAULT_HOST_ICON = "src/assets/entities/desktop.png";
 
 export interface Host extends DeviceBase {
   type: "host";
-
   mac_address: string;
   gateway: string;
   icon: string;
