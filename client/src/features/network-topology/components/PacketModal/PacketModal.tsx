@@ -9,7 +9,7 @@ interface PacketModalProps {
     handlePopoverClose: () => void;
 }
 
-type PacketType = 'normal' | 'ARP';
+type PacketType = 'normal' | 'ARP' | 'PING';;
 
 const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
     const [destMAC, setDestMAC] = useState('');
@@ -89,9 +89,35 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
                 isResponse: false,
                 isFlooded: true,
                 type: 'ARP',
-                vlanId, // <-- вот тут!
+                vlanId,
             };
-        } else {
+        }
+        else if (packetType === 'PING') {
+            const now = Date.now();
+            if (!destMAC || macError) {
+                alert('Укажите корректный MAC-адрес назначения для ping');
+                return;
+            }
+            packet = {
+                id: crypto.randomUUID(),
+                path: [],
+                currentHop: 0,
+                sourceDeviceId: device.id,
+                sourcePortId: selectedPortId,
+                sourceMAC,
+                destMAC,
+                payload: JSON.stringify({ type: "PING-REQUEST" }),
+                ttl: 64,
+                x: device.x || 0,
+                y: device.y || 0,
+                isResponse: false,
+                isFlooded: false,
+                type: "PING",
+                vlanId,
+                sentAt: now,
+            };
+        }
+        else {
             packet = {
                 id: crypto.randomUUID(),
                 path: [],
@@ -138,6 +164,7 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
             >
                 <FormControlLabel value="normal" control={<Radio />} label="Обычный пакет" />
                 <FormControlLabel value="ARP" control={<Radio />} label="ARP-запрос" />
+                <FormControlLabel value="PING" control={<Radio />} label="Ping" />
             </RadioGroup>
 
             <Box>
@@ -189,14 +216,31 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
                     required
                 />
             )}
+            {packetType === 'PING' && (
+                <TextField
+                    label='MAC назначения (или IP, если реализуешь)'
+                    value={destMAC}
+                    onChange={(e) => handleMacChange(e.target.value)}
+                    error={!!macError}
+                    helperText={macError}
+                    size='small'
+                    placeholder='MAC-адрес получателя'
+                />
+            )}
 
             <TextField
-                label={packetType === 'ARP' ? 'ARP payload (автоматически)' : 'Содержимое пакета'}
-                value={packetType === 'ARP' ? '' : payload}
+                label={
+                    packetType === 'ARP'
+                        ? 'ARP payload (автоматически)'
+                        : packetType === 'PING'
+                            ? 'Ping payload (автоматически)'
+                            : 'Содержимое пакета'
+                }
+                value={packetType === 'ARP' || packetType === 'PING' ? '' : payload}
                 onChange={(e) => setPayload(e.target.value)}
                 multiline
                 rows={3}
-                disabled={packetType === 'ARP'}
+                disabled={packetType === 'ARP' || packetType === 'PING'}
             />
 
             <Button

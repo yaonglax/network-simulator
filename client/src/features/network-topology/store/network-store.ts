@@ -24,6 +24,7 @@ export interface NetworkState {
   isSimulationRunning: boolean;
   addDevice: (device: Device) => void;
   updateDevice: (id: string, updates: Partial<Device>) => void;
+  removeDevice: (deviceId: string) => void;
   connectPorts: (from: Port, to: Port) => void;
   addPacket: (packet: NetworkPacket) => void;
   updatePacket: (id: string, updates: Partial<NetworkPacket>) => void;
@@ -49,9 +50,13 @@ export interface NetworkState {
   ageMacTables: () => void;
 }
 
-/**
- * Универсальный BFS для построения path между двумя устройствами.
- */
+function findDeviceByIp(
+  ip: string,
+  devices: Record<string, Device>
+): Device | undefined {
+  return Object.values(devices).find((d) => d.ip_address === ip);
+}
+
 function buildPathBFS(
   fromDeviceId: string,
   toDeviceId: string,
@@ -199,7 +204,38 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         },
       };
     }),
+  removeDevice: (deviceId: string) =>
+    set((state) => {
+      // Удаляем устройство
+      const newDevices = { ...state.devices };
+      delete newDevices[deviceId];
 
+      // Удаляем все соединения, связанные с этим устройством
+      const newConnections = state.connections
+        ? state.connections.filter(
+            (conn) =>
+              conn.from.deviceId !== deviceId && conn.to.deviceId !== deviceId
+          )
+        : [];
+
+      // Создаём новый объект устройств с очищенными портами
+      const cleanedDevices: typeof newDevices = {};
+      Object.entries(newDevices).forEach(([id, device]) => {
+        cleanedDevices[id] = {
+          ...device,
+          ports: device.ports.map((port) =>
+            port.connectedTo && port.connectedTo.deviceId === deviceId
+              ? { ...port, connectedTo: undefined }
+              : port
+          ),
+        };
+      });
+
+      return {
+        devices: cleanedDevices,
+        connections: newConnections,
+      };
+    }),
   connectPorts: (from: Port, to: Port) =>
     set((state) => {
       const fromDevice = state.devices[from.deviceId];
@@ -472,6 +508,63 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
           }
         } catch (e) {}
       }
+      if (packet.type === "PING" && packet.payload) {
+        try {
+          const pingPayload = JSON.parse(packet.payload);
+          if (
+            pingPayload.type === "PING-REQUEST" &&
+            device.mac_address === packet.destMAC
+          ) {
+            setTimeout(() => {
+              get().removePacket(packetId);
+              const allDevices = get().devices;
+              const senderDevice = Object.values(allDevices).find(
+                (d) => d.mac_address === packet.sourceMAC
+              );
+              if (!senderDevice) return;
+              const replyPath = buildArpReplyPath(
+                device,
+                senderDevice,
+                get().devices,
+                get().connections
+              );
+              const replyPacket: NetworkPacket = {
+                id: `ping-reply-${Date.now()}-${device.id}`,
+                sourceDeviceId: device.id,
+                sourcePortId: device.ports[0].id,
+                destMAC: packet.sourceMAC,
+                sourceMAC: device.mac_address,
+                vlanId: packet.vlanId,
+                payload: JSON.stringify({ type: "PING-REPLY" }),
+                path: replyPath,
+                currentHop: 0,
+                x: device.x ?? 0,
+                y: device.y ?? 0,
+                isFlooded: false,
+                isResponse: true,
+                ttl: 64,
+                type: "PING",
+                visited: new Set<string>(),
+                sentAt: packet.sentAt,
+              };
+              get().addPacket(replyPacket);
+              setTimeout(() => {
+                get().sendPacket(replyPacket.id);
+              }, 500);
+            }, 1000);
+            return;
+          }
+          if (
+            pingPayload.type === "PING-REPLY" &&
+            device.mac_address === packet.destMAC
+          ) {
+            const rtt = packet.sentAt ? Date.now() - packet.sentAt : undefined;
+            console.log("RTT:", rtt);
+            setTimeout(() => get().removePacket(packetId), 2000);
+            return;
+          }
+        } catch (e) {}
+      }
       // Flood-пакет исчезает на любом хосте, кроме отправителя (currentHop > 0)
       if (packet.isFlooded && packet.currentHop > 0) {
         setTimeout(() => get().removePacket(packetId), 4000);
@@ -668,7 +761,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             const nextDevice = state.devices[nextDeviceId];
             const visitKey = `${nextDeviceId}:${nextPortId}`;
             if (visited.has(visitKey)) return;
-            // НЕ делай visited.add(visitKey) здесь!
             console.log(
               `[SWITCH] ${deviceId} FLOOD пакет ${packet.id} по порту ${floodPort.id} → ${nextDeviceId}:${nextPortId}`
             );

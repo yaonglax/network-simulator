@@ -48,6 +48,7 @@ export interface NetworkPacket {
   visited?: Set<string>;
   type?: string;
   arpReplyPending?: boolean;
+  sentAt?: number;
 }
 
 export interface MacTableEntry {

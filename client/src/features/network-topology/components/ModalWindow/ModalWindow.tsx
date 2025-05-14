@@ -408,11 +408,12 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                                 <Select
                                     margin="dense"
                                     label="Port Type"
-                                    value={port.type || 'access'}
+                                    value={port.type ?? 'none'}
                                     onChange={e => handlePortChange(index, 'type', e.target.value as PortType)}
                                     fullWidth
                                     sx={{ mt: 2 }}
                                 >
+                                    <MenuItem value='none'>None</MenuItem>
                                     <MenuItem value="access">Access</MenuItem>
                                     <MenuItem value="trunk">Trunk</MenuItem>
                                 </Select>
