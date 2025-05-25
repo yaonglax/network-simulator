@@ -445,6 +445,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
           return;
         }
       }
+
       // Flood highlight
       const connection = state.connections.find(
         (c) =>
@@ -455,7 +456,8 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         get().setActiveConnection(connection.id);
         setTimeout(() => get().clearActiveConnection(connection.id), 4000);
       }
-      // ARP-логика
+
+      // --- ARP ---
       if (packet.type === "ARP" && packet.payload) {
         try {
           const arpPayload = JSON.parse(packet.payload);
@@ -497,7 +499,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
                 isResponse: true,
                 ttl: 64,
                 type: "ARP",
-                visited: new Set<string>(),
+                visited: new Set<string>(), // обязательно новый Set!
               };
               get().addPacket(replyPacket);
               setTimeout(() => {
@@ -508,9 +510,12 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
           }
         } catch (e) {}
       }
+
+      // --- PING ---
       if (packet.type === "PING" && packet.payload) {
         try {
           const pingPayload = JSON.parse(packet.payload);
+          // Получатель ping-запроса
           if (
             pingPayload.type === "PING-REQUEST" &&
             device.mac_address === packet.destMAC
@@ -544,8 +549,8 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
                 isResponse: true,
                 ttl: 64,
                 type: "PING",
-                visited: new Set<string>(),
-                sentAt: packet.sentAt,
+                visited: new Set<string>(), // обязательно новый Set!
+                sentAt: packet.sentAt, // копируем sentAt из запроса
               };
               get().addPacket(replyPacket);
               setTimeout(() => {
@@ -554,22 +559,28 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             }, 1000);
             return;
           }
+          // Получатель ping-ответа (reply)
           if (
             pingPayload.type === "PING-REPLY" &&
             device.mac_address === packet.destMAC
           ) {
             const rtt = packet.sentAt ? Date.now() - packet.sentAt : undefined;
-            console.log("RTT:", rtt);
+            console.log(
+              `[PING] Host ${device.name} (${device.mac_address}) получил reply, RTT = ${rtt} мс, packet:`,
+              packet
+            );
             setTimeout(() => get().removePacket(packetId), 2000);
             return;
           }
         } catch (e) {}
       }
+
       // Flood-пакет исчезает на любом хосте, кроме отправителя (currentHop > 0)
       if (packet.isFlooded && packet.currentHop > 0) {
         setTimeout(() => get().removePacket(packetId), 4000);
         return;
       }
+
       // Обычный пакет: если MAC совпадает — доставляем
       if (packet.destMAC === device.mac_address) {
         get().updatePacket(packetId, {
@@ -578,6 +589,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         setTimeout(() => get().removePacket(packetId), 4000);
         return;
       }
+
       // Если есть следующий hop — передаём дальше!
       if (packet.currentHop < packet.path.length - 1) {
         const nextHop = packet.path[packet.currentHop + 1];
@@ -628,6 +640,8 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
           `[SWITCH] ${deviceId} тегирует пакет ${packet.id} VLAN=${effectiveVlanId} на входе с access-порта ${portId}`
         );
       }
+
+      // Forwarding loop prevention
       let visited =
         packet.visited instanceof Set
           ? packet.visited
@@ -635,7 +649,10 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       const hopKey = `${device.id}:${port.id}`;
       if (visited.has(hopKey)) {
         console.log(
-          `[SWITCH] ${deviceId} дропает пакет ${packet.id}: forwarding loop (уже был на этом порту)`
+          `[SWITCH] ${deviceId} дропает пакет ${packet.id}: forwarding loop (уже был на этом порту), visited:`,
+          Array.from(visited),
+          "hopKey:",
+          hopKey
         );
         get().removePacket(packetId);
         return;
@@ -691,9 +708,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
               destPort.type === "access" &&
               effectiveVlanId !== destPort.accessVlan
             ) {
-              console.log(
-                `[SWITCH] ${deviceId} ОТБРОСИЛ пакет ${packet.id}: VLAN mismatch (packet VLAN ${effectiveVlanId}, port VLAN ...)`
-              );
               setTimeout(() => get().removePacket(packetId), 1000);
               return;
             }
@@ -791,8 +805,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
                 isFlooded: true,
                 isResponse: false,
                 ttl: packet.ttl,
-                visited: new Set(visited), // просто копия!
+                visited: new Set(visited), // обязательно новый Set!
                 type: packet.type,
+                sentAt: packet.sentAt, // для ping-flood
               };
               get().addPacket(floodPacket);
               await delay(1500);

@@ -1,20 +1,10 @@
+// electron/preload.js
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
   backend: {
     calculateDevice: (data) => ipcRenderer.invoke("calculate-device", data),
-    checkConnection: async () => {
-      try {
-        const isConnected = await ipcRenderer.invoke(
-          "check-backend-connection"
-        );
-        console.log("Backend connection status:", isConnected);
-        return isConnected;
-      } catch (error) {
-        console.error("Error checking connection:", error);
-        return false;
-      }
-    },
+    checkConnection: async () => true,
   },
   storage: {
     get: (key) => ipcRenderer.invoke("storage:get", key),

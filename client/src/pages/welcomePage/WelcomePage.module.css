@@ -1,12 +1,23 @@
+@charset "UTF-8";
 body {
-  background-color: var(--background-color);
-  color: var(--main-color-dark-theme);
+  background-color: var(--bg-dark-gray);
+  color: var(--text-gray);
   height: 100vh;
+  margin: 0;
 }
 
 .welcomepage {
   width: 100%;
   height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg-dark-gray);
+}
+.welcomepage canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
 }
 .welcomepage__wrapper {
   display: flex;
@@ -14,6 +25,8 @@ body {
   align-items: center;
   justify-content: center;
   height: 100%;
+  position: relative;
+  z-index: 2; /* Текст поверх Canvas */
 }
 .welcomepage__wrapper-title {
   font-family: "ArchivoBlack";
@@ -26,4 +39,17 @@ body {
   font-size: 24px;
   text-transform: lowercase;
   margin-bottom: 20px;
+}
+.welcomepage__wrapper-btn {
+  width: 160px;
+  height: 70px;
+  background-color: var(--element-gray) !important;
+  border-radius: 17px !important;
+  color: var(--text-gray) !important;
+  font-size: 21px !important;
+}
+.welcomepage__wrapper-btn:hover {
+  background-color: rgba(92, 75, 140, 0.5) !important;
+  border: 1px solid var(--highlight-purple);
+  box-shadow: 1px 1px 8px var(--highlight-purple);
 }/*# sourceMappingURL=WelcomePage.module.css.map */

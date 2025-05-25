@@ -1,19 +1,19 @@
-import { Box } from '@mui/material'
-import { DevicesPanel } from "@/features/network-topology/components/DevicesPanel/DevicesPanel";
+import { Box } from '@mui/material';
 import { NetworkCanvas } from '@/features/network-topology/components/NetworkCanvas/NetworkCanvas';
-import { SaveLoadControls } from '@/features/network-topology/components';
+import PersistentDrawerLeft from '@/features/teory/Drawer';
+
 const NetworkEditorPage = () => {
-
     return (
-        <>
-            <Box display="flex" height="100vh" p={2} gap={2}>
-                <DevicesPanel />
-                <NetworkCanvas />
-                <SaveLoadControls />
-            </Box>
+        <Box sx={{
+            height: '100vh',
+            backgroundColor: 'var(--bg-dark-gray)',
+            position: 'relative',
+            overflow: 'hidden'
+        }}>
+            <PersistentDrawerLeft />
+            <NetworkCanvas />
+        </Box>
+    );
+};
 
-        </>
-    )
-}
-
-export default NetworkEditorPage
+export default NetworkEditorPage;

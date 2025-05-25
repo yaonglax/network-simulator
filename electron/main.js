@@ -1,124 +1,29 @@
+// electron/main.js
 const { app, BrowserWindow, ipcMain, Menu } = require("electron");
 const path = require("path");
-const { setupSocket, getSocket } = require("./socket");
-const { io } = require("socket.io-client");
-const { spawn } = require("child_process");
-const pythonProcess = spawn("python", ["py-backend/ws_server.py"]);
 const Store = require("electron-store").default;
 const fs = require("fs");
 const { dialog } = require("electron");
-
-pythonProcess.stdout.on("data", (data) => {
-  console.log(`Python: ${data}`);
-});
+const {
+  generateMac,
+  generateIp,
+  getGateway,
+} = require("../client/src/utils/network.cjs");
 
 let mainWindow;
 const store = new Store();
 
-ipcMain.handle("storage:get", (event, key) => {
-  try {
-    return store.get(key);
-  } catch (error) {
-    console.error("Error reading from store:", error);
-    return null;
-  }
-});
-ipcMain.on("force-focus", () => {
-  if (!mainWindow) return;
-
-  // Для Windows нужны особые хаки
-  if (process.platform === "win32") {
-    // 1. Сначала снимаем фокус
-    mainWindow.blur();
-    // 2. Меняем состояние окна для "перезагрузки" фокуса
-    mainWindow.setAlwaysOnTop(true);
-    // 3. Возвращаем фокус после небольшой задержки
-    setTimeout(() => {
-      mainWindow.setAlwaysOnTop(false);
-      mainWindow.focus();
-      // Дополнительные меры
-      mainWindow.webContents.focus();
-      mainWindow.webContents.send("focus-inputs");
-    }, 100);
-  } else {
-    // Для других ОС просто фокусируем
-    mainWindow.focus();
-    mainWindow.webContents.focus();
-    mainWindow.webContents.send("focus-inputs");
-  }
-});
-ipcMain.handle("storage:set", (event, key, value) => {
-  try {
-    store.set(key, value);
-    return true;
-  } catch (error) {
-    console.error("Error writing to store:", error);
-    return false;
-  }
-});
-
-ipcMain.handle("storage:remove", (event, key) => {
-  try {
-    store.delete(key);
-    return true;
-  } catch (error) {
-    console.error("Error removing from store:", error);
-    return false;
-  }
-});
-
-ipcMain.handle("storage:saveToFile", async (event, data) => {
-  try {
-    const { filePath } = await dialog.showSaveDialog({
-      title: "Save Network Topology",
-      defaultPath: path.join(
-        app.getPath("documents"),
-        `network_topology_${Date.now()}.json`
-      ),
-      filters: [{ name: "JSON Files", extensions: ["json"] }],
-    });
-
-    if (filePath) {
-      fs.writeFileSync(filePath, data);
-      return filePath;
-    }
-    return null;
-  } catch (error) {
-    console.error("Error saving file:", error);
-    throw error;
-  }
-});
-
-ipcMain.handle("storage:loadFromFile", async () => {
-  try {
-    const { filePaths } = await dialog.showOpenDialog({
-      title: "Load Network Topology",
-      filters: [{ name: "JSON Files", extensions: ["json"] }],
-      properties: ["openFile"],
-    });
-
-    if (filePaths?.length > 0) {
-      return fs.readFileSync(filePaths[0], "utf-8");
-    }
-    return null;
-  } catch (error) {
-    console.error("Error loading file:", error);
-    throw error;
-  }
-});
-
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    fullscreen: true,
+    icon: path.join(__dirname, "../client/public/cat1.png"),
     webPreferences: {
-      sandbox: false,
-      webSecurity: false,
-      allowRunningInsecureContent: true,
-      experimentalFeatures: true,
+      sandbox: true,
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, "preload.js"),
+      webSecurity: process.env.NODE_ENV !== "development",
+      allowRunningInsecureContent: process.env.NODE_ENV === "development",
     },
   });
   if (process.env.NODE_ENV === "development") {
@@ -128,53 +33,151 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
   }
 }
-Menu.setApplicationMenu(false);
+
+Menu.setApplicationMenu(null);
+
 app.whenReady().then(() => {
   createWindow();
-  socket = io("http://localhost:5000");
-  socket.on("connect", () => {
-    console.log("Connected to backend");
-  });
+});
 
-  socket.on("disconnect", () => {
-    console.log("Disconnected from backend");
-  });
+ipcMain.handle("storage:get", (event, key) => {
+  try {
+    return store.get(key);
+  } catch (error) {
+    throw new Error(`Не удалось получить ${key}: ${error.message}`);
+  }
+});
+
+ipcMain.handle("storage:set", (event, key, value) => {
+  try {
+    store.set(key, value);
+    return true;
+  } catch (error) {
+    throw new Error(`Не удалось сохранить ${key}: ${error.message}`);
+  }
+});
+
+ipcMain.handle("storage:remove", (event, key) => {
+  try {
+    store.delete(key);
+    return true;
+  } catch (error) {
+    throw new Error(`Не удалось удалить ${key}: ${error.message}`);
+  }
+});
+
+ipcMain.handle("storage:saveToFile", async (event, data) => {
+  try {
+    const { filePath } = await dialog.showSaveDialog({
+      title: "Сохранить топологию сети",
+      defaultPath: path.join(
+        app.getPath("documents"),
+        `network_topology_${Date.now()}.json`
+      ),
+      filters: [{ name: "JSON Files", extensions: ["json"] }],
+    });
+    if (filePath) {
+      fs.writeFileSync(filePath, data);
+      return filePath;
+    }
+    return null;
+  } catch (error) {
+    throw new Error(`Не удалось сохранить файл: ${error.message}`);
+  }
+});
+
+ipcMain.handle("storage:loadFromFile", async () => {
+  try {
+    const { filePaths } = await dialog.showOpenDialog({
+      title: "Загрузить топологию сети",
+      filters: [{ name: "JSON Files", extensions: ["json"] }],
+      properties: ["openFile"],
+    });
+    if (filePaths?.length > 0) {
+      return fs.readFileSync(filePaths[0], "utf-8");
+    }
+    return null;
+  } catch (error) {
+    throw new Error(`Не удалось загрузить файл: ${error.message}`);
+  }
+});
+
+ipcMain.on("force-focus", () => {
+  if (!mainWindow) return;
+  if (process.platform === "win32") {
+    mainWindow.blur();
+    mainWindow.setAlwaysOnTop(true);
+    setTimeout(() => {
+      mainWindow.setAlwaysOnTop(false);
+      mainWindow.focus();
+      mainWindow.webContents.focus();
+      mainWindow.webContents.send("focus-inputs");
+    }, 100);
+  } else {
+    mainWindow.focus();
+    mainWindow.webContents.focus();
+    mainWindow.webContents.send("focus-inputs");
+  }
 });
 
 ipcMain.handle("calculate-device", async (event, data) => {
-  console.log("Calculation request received:", data);
   try {
-    const result = await socketCall(socket, "calculate_device", data);
-    if (result.status === "error") {
-      throw new Error(result.message);
+    console.log("Received data for calculate-device:", data); // Debugging
+    if (!data.type || !data.network) {
+      throw new Error("Отсутствуют обязательные поля: 'type' и/или 'network'");
     }
-    console.log("Result from server:", result);
-    return result;
+
+    const ip_address = generateIp(data.network);
+    const mac_address = generateMac();
+    let ports = [];
+
+    if (data.type === "switch") {
+      for (
+        let idx = 0;
+        idx < (data.portsCount || data.ports?.length || 1);
+        idx++
+      ) {
+        const port = data.ports?.[idx] || {};
+        ports.push({
+          name: port.name || `port${idx + 1}`,
+          vlan: port.vlan || 1,
+        });
+      }
+    } else {
+      if (data.ports && Array.isArray(data.ports)) {
+        ports = data.ports.map((port) => ({
+          ip_address,
+          subnet_mask: port.subnet_mask || "255.255.255.0",
+          vlan: port.vlan || 1,
+        }));
+      } else {
+        ports = [
+          {
+            ip_address,
+            subnet_mask: "255.255.255.0",
+            vlan: 1,
+          },
+        ];
+      }
+    }
+
+    const result = {
+      name:
+        data.name || `${data.type}-${Math.floor(Math.random() * 900) + 100}`,
+      ip: ip_address,
+      mac: mac_address,
+      gateway: getGateway(data.network),
+      ports,
+    };
+
+    return { status: "success", data: result };
   } catch (error) {
-    console.error("Calculation failed:", error);
-    throw new Error(`Calculation failed: ${error.message}`);
+    throw new Error(`Ошибка расчёта: ${error.message}`);
   }
 });
-function socketCall(socket, event, data) {
-  return new Promise((resolve, reject) => {
-    socket.emit(event, data);
-    socket.once(event + "_result", (result) => {
-      if (result.status === "error") {
-        reject(new Error(result.message)); // Reject при ошибке
-      } else {
-        resolve(result); // Resolve при успехе
-      }
-    });
-  });
-}
+
 ipcMain.handle("check-backend-connection", async () => {
-  try {
-    console.log("Checking backend connection...");
-    return socket.connected;
-  } catch (error) {
-    console.error("Error checking connection:", error); // Логирование ошибок
-    return false;
-  }
+  return true;
 });
 
 app.on("window-all-closed", () => {

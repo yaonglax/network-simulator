@@ -1,3 +1,4 @@
+// client/src/features/network-topology/components/ModalWindow.tsx
 import React, { useState, useEffect } from 'react';
 import {
     Dialog,
@@ -31,6 +32,48 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
     onSubmit,
     deviceType,
 }) => {
+    const formStyles = {
+        '& .MuiInputBase-input': {
+            color: 'var(--contrast-white)',
+        },
+        '& .MuiOutlinedInput-root': {
+            '& fieldset': {
+                borderColor: 'var(--detail-gray)',
+            },
+            '&:hover fieldset': {
+                borderColor: 'var(--hover-purple)',
+            },
+            '&.Mui-focused fieldset': {
+                borderColor: 'var(--highlight-purple)',
+
+            },
+        },
+        '& .MuiInputLabel-root': {
+            color: 'var(--contrast-white)',
+            '&.Mui-focused': {
+                color: 'var(--highlight-purple)',
+            },
+        },
+        '& .MuiFormHelperText-root': {
+            color: 'rgba(229, 231, 235, 0.5)',
+            '&.Mui-error': {
+                color: '#f44336',
+            },
+        },
+        '& .MuiSelect-icon': {
+            color: 'rgba(229, 231, 235, 0.5)',
+        },
+        '&.Mui-focused .MuiSelect-icon': {
+            color: 'var(--detail-gray)',
+        },
+        '& .MuiCheckbox-root': {
+            color: 'var(--highlight-purple)',
+            '&.Mui-checked': {
+                color: 'var(--highlight-purple)',
+            },
+        },
+    };
+    const [submitAttempted, setSubmitAttempted] = useState(false);
     const { devices } = useNetworkStore();
     const [isVlanEnabled, setIsVlanEnabled] = useState(false);
     const [isCalculating, setIsCalculating] = useState(false);
@@ -40,26 +83,27 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
         mac_address: '',
         gateway: '',
     });
-    const [portCount, setPortCount] = useState(
-        deviceType ? DEVICE_PORT_CONFIG[deviceType].defaultPorts : 1
-    );
-    const [ports, setPorts] = useState<Array<{
-        type: PortType;
-        name: string;
-        ip_address?: string;
-        accessVlan?: number;
-        isVlanEnabled?: boolean;
-        allowedVlanList?: number[];
-        subnet_mask?: string;
-        mac_address?: string;
-        active?: boolean;
-    }>>([]);
+    const [portCount, setPortCount] = useState(deviceType ? DEVICE_PORT_CONFIG[deviceType].defaultPorts : 1);
+    const [ports, setPorts] = useState<
+        Array<{
+            type: PortType;
+            name: string;
+            ip_address?: string;
+            accessVlan?: number;
+            isVlanEnabled?: boolean;
+            allowedVlanList?: number[];
+            subnet_mask?: string;
+            mac_address?: string;
+            active?: boolean;
+        }>
+    >([]);
     const [portNameErrors, setPortNameErrors] = useState<string[]>([]);
     const [portVlanErrors, setPortVlanErrors] = useState<string[]>([]);
     const [portAllowedVlanErrors, setPortAllowedVlanErrors] = useState<string[]>([]);
 
     const validatePortNames = (newPorts: typeof ports) => {
         const errors = newPorts.map((port, index) => {
+            if (!submitAttempted) return '';
             if (!port.name) return 'Имя порта обязательно';
             if (newPorts.some((p, i) => i !== index && p.name === port.name)) {
                 return 'Имена портов должны быть уникальными';
@@ -67,7 +111,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
             return '';
         });
         setPortNameErrors(errors);
-        return errors.every(e => !e);
+        return errors.every((e) => !e);
     };
 
     const validateVlanIds = (newPorts: typeof ports) => {
@@ -80,7 +124,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
             return '';
         });
         setPortVlanErrors(errors);
-        return errors.every(e => !e);
+        return errors.every((e) => !e);
     };
 
     const validateAllowedVlanLists = (newPorts: typeof ports) => {
@@ -89,7 +133,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                 if (!port.allowedVlanList || port.allowedVlanList.length === 0) {
                     return 'Список разрешённых VLAN не может быть пустым';
                 }
-                if (port.allowedVlanList.some(vlan => vlan < 1 || vlan > 4094)) {
+                if (port.allowedVlanList.some((vlan) => vlan < 1 || vlan > 4094)) {
                     return 'VLAN IDs должны быть в диапазоне 1–4094';
                 }
                 const uniqueVlanList = new Set(port.allowedVlanList);
@@ -100,7 +144,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
             return '';
         });
         setPortAllowedVlanErrors(errors);
-        return errors.every(e => !e);
+        return errors.every((e) => !e);
     };
 
     const handleAutoCalculate = async () => {
@@ -108,19 +152,12 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
 
         try {
             setIsCalculating(true);
-            const isConnected = await window.electronAPI.backend.checkConnection();
-            console.log('Connection status:', isConnected);
-
-            if (!isConnected) {
-                throw new Error('No connection to backend');
-            }
-
-            const response = await window.electronAPI.backend.calculateDevice({
+            const requestData = {
                 type: deviceType,
                 network: '192.168.1.0/24',
                 portsCount: portCount,
                 name: formData.name || undefined,
-                ports: ports.map(p => ({
+                ports: ports.map((p) => ({
                     type: p.type || 'none',
                     name: p.name || `Port ${ports.indexOf(p) + 1}`,
                     ip_address: p.ip_address,
@@ -128,14 +165,16 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                     allowedVlanList: p.isVlanEnabled && p.type === 'trunk' ? p.allowedVlanList : undefined,
                     subnet_mask: p.subnet_mask,
                 })),
-            });
+            };
+            console.log('Sending calculate-device request:', requestData); // Debugging
+            const response = await window.electronAPI.backend.calculateDevice(requestData);
 
             if (response.status !== 'success' || !response.data) {
-                throw new Error(response.message || 'Неверный формат ответа от сервера');
+                throw new Error(response.message || 'Неверный формат ответа');
             }
 
             const { ip, mac, gateway, ports: calculatedPorts = [] } = response.data;
-            setFormData(prev => ({
+            setFormData((prev) => ({
                 ...prev,
                 ip_address: ip || prev.ip_address,
                 mac_address: mac || prev.mac_address,
@@ -161,8 +200,8 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                 validateAllowedVlanLists(newPorts);
             }
         } catch (error) {
-            console.error('Calculation error:', error);
-            if (error instanceof Error) alert(`Error: ${error.message}`);
+            console.error('Ошибка расчёта:', error);
+            if (error instanceof Error) alert(`Ошибка: ${error.message}`);
         } finally {
             setIsCalculating(false);
         }
@@ -171,8 +210,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
     const handlePortChange = (index: number, field: string, value: any) => {
         const newPorts = [...ports];
         if (field === 'allowedVlanList') {
-            // Разрешить ввод запятых, чисел и промежуточных состояний
-            const input = value.replace(/[^0-9,]/g, ''); // Удаляем всё, кроме чисел и запятых
+            const input = value.replace(/[^0-9,]/g, '');
             const vlanList = input
                 .split(',')
                 .map((v: string) => Number(v.trim()))
@@ -192,20 +230,19 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
     const checkUniqueIpAddress = (ipAddress: string, deviceId: string | null = null): boolean => {
-        const allPorts = Object.values(devices).flatMap(device => device.ports || []);
-        const relevantPorts = deviceId
-            ? allPorts.filter(port => port.deviceId === deviceId)
-            : allPorts;
-        const existingIps = relevantPorts.map(port => port.ip_address).filter(ip => ip !== undefined);
+        const allPorts = Object.values(devices).flatMap((device) => device.ports || []);
+        const relevantPorts = deviceId ? allPorts.filter((port) => port.deviceId === deviceId) : allPorts;
+        const existingIps = relevantPorts.map((port) => port.ip_address).filter((ip) => ip !== undefined);
         return !existingIps.includes(ipAddress);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        setSubmitAttempted(true);
 
         if (!validatePortNames(ports) || !validateVlanIds(ports) || !validateAllowedVlanLists(ports)) {
             alert('Пожалуйста, исправьте ошибки в настройках портов');
@@ -220,7 +257,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                     return;
                 }
 
-                const updatedPorts = ports.map(port => ({
+                const updatedPorts = ports.map((port) => ({
                     ...port,
                     ip_address: formData.ip_address,
                     name: port.name || `Port ${ports.indexOf(port) + 1}`,
@@ -269,6 +306,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
 
     useEffect(() => {
         if (modalOpen) {
+            setSubmitAttempted(false);
             setFormData({
                 name: '',
                 ip_address: '',
@@ -346,38 +384,55 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
 
     return (
         <Dialog open={modalOpen} onClose={onClose} maxWidth="sm" fullWidth>
-            <form onSubmit={handleSubmit}>
-                <DialogTitle>Add New {deviceType?.toUpperCase() || 'Device'}</DialogTitle>
+            <form onSubmit={handleSubmit} style={{ backgroundColor: 'var(--bg-dark-gray)', color: 'var(--text-gray)' }}>
+                <DialogTitle sx={{ fontSize: '20px', textTransform: 'uppercase', fontWeight: '700' }}>
+                    Добавить новое устройство: {deviceType?.toUpperCase() || 'Device'}
+                </DialogTitle>
                 <DialogContent dividers>
-                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'start', mb: 2 }}>
                         <TextField
                             id="device-name-input"
                             autoFocus
                             margin="dense"
                             name="name"
-                            label="Device Name"
+                            label="Имя устройства"
                             fullWidth
                             value={formData.name}
                             onChange={handleChange}
                             required
-                            error={formData.name === ''}
-                            helperText={formData.name === '' ? 'Имя устройства обязательно' : ''}
+                            error={submitAttempted && formData.name === ''}
+                            helperText={submitAttempted && formData.name === '' ? 'Имя устройства обязательно' : ''}
+                            sx={formStyles}
                         />
                         <Button
                             onClick={handleAutoCalculate}
                             disabled={isCalculating || !deviceType}
                             variant="outlined"
-                            sx={{ height: '56px', mt: '8px' }}
+                            sx={{
+                                height: '56px',
+                                mt: '8px',
+                                borderColor: 'var(--secondary-purple)',
+                                color: 'var(--accent-purple)',
+                                fontWeight: 500,
+                                width: '260px',
+                                borderWidth: '2px',
+                                transition: 'all 0.2s ease',
+
+                                '&:hover': {
+                                    backgroundColor: 'var(--hover-purple)',
+                                    color: 'var(--text-gray)'
+                                },
+                            }}
                             startIcon={isCalculating ? <CircularProgress size={20} /> : null}
                         >
-                            Auto Calculate
+                            {isCalculating ? '' : 'Рассчитать автоматически'}
                         </Button>
                     </Box>
 
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, ...formStyles }}>
                         {deviceType && deviceType !== 'host' && (
                             <TextField
-                                label="Number of Ports"
+                                label="Количество портов"
                                 type="number"
                                 inputProps={{
                                     min: DEVICE_PORT_CONFIG[deviceType].minPorts,
@@ -390,44 +445,41 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                         )}
 
                         <Typography variant="h6" sx={{ mt: 2 }}>
-                            Port Configuration
+                            Конфигурация порта
                         </Typography>
                         {ports.map((port, index) => (
-                            <Box key={index} sx={{ mt: 2, p: 2, border: '1px solid #eee', borderRadius: 1 }}>
-                                <Typography variant="subtitle1">Port {index + 1}</Typography>
+                            <Box key={index} sx={{ mt: 2, p: 2, border: '1px solid var(--element-gray)', borderRadius: 1 }}>
+                                <Typography variant="subtitle1">Порт {index + 1}</Typography>
                                 <TextField
                                     margin="dense"
-                                    label={`Port Name ${index + 1}`}
+                                    label={`Имя порта ${index + 1}`}
                                     value={port.name}
-                                    onChange={e => handlePortChange(index, 'name', e.target.value)}
+                                    onChange={(e) => handlePortChange(index, 'name', e.target.value)}
                                     fullWidth
                                     required
                                     error={!!portNameErrors[index]}
                                     helperText={portNameErrors[index]}
+                                    sx={formStyles}
                                 />
-                                <Select
-                                    margin="dense"
-                                    label="Port Type"
-                                    value={port.type ?? 'none'}
-                                    onChange={e => handlePortChange(index, 'type', e.target.value as PortType)}
-                                    fullWidth
-                                    sx={{ mt: 2 }}
-                                >
-                                    <MenuItem value='none'>None</MenuItem>
-                                    <MenuItem value="access">Access</MenuItem>
-                                    <MenuItem value="trunk">Trunk</MenuItem>
-                                </Select>
+
                                 <FormControlLabel
                                     control={
                                         <Checkbox
+                                            sx={{ '& .MuiSvgIcon-root': { color: 'var(--detail-gray)' } }}
                                             checked={port.isVlanEnabled || false}
-                                            onChange={e => {
+                                            onChange={(e) => {
                                                 const newPorts = [...ports];
                                                 newPorts[index] = {
                                                     ...newPorts[index],
                                                     isVlanEnabled: e.target.checked,
-                                                    accessVlan: e.target.checked && newPorts[index].type === 'access' ? (newPorts[index].accessVlan || 1) : undefined,
-                                                    allowedVlanList: e.target.checked && newPorts[index].type === 'trunk' ? (newPorts[index].allowedVlanList || [1]) : undefined,
+                                                    accessVlan:
+                                                        e.target.checked && newPorts[index].type === 'access'
+                                                            ? newPorts[index].accessVlan || 1
+                                                            : undefined,
+                                                    allowedVlanList:
+                                                        e.target.checked && newPorts[index].type === 'trunk'
+                                                            ? newPorts[index].allowedVlanList || [1]
+                                                            : undefined,
                                                 };
                                                 setPorts(newPorts);
                                                 validateVlanIds(newPorts);
@@ -435,16 +487,39 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                                             }}
                                         />
                                     }
-                                    label="Enable VLAN"
+                                    label="Включить VLAN"
                                     sx={{ mt: 1 }}
                                 />
+                                {port.isVlanEnabled ?
+                                    <Select
+                                        margin="dense"
+                                        value={port.type ?? 'none'}
+                                        onChange={(e) => handlePortChange(index, 'type', e.target.value as PortType)}
+                                        fullWidth
+                                        sx={{ mt: 2, mb: 2, color: 'white', '& .MuiSelect-icon': { color: '#fff' } }}
+                                        MenuProps={{
+                                            sx: {
+                                                '& .MuiPaper-root': {
+                                                    backgroundColor: '#181C22',
+                                                    '& .MuiMenuItem-root': { color: 'white' },
+                                                },
+                                            },
+                                        }}
+                                    >
+                                        <MenuItem value="none">None</MenuItem>
+                                        <MenuItem value="access">Access</MenuItem>
+                                        <MenuItem value="trunk">Trunk</MenuItem>
+                                    </Select>
+                                    :
+                                    ''}
+
                                 {port.isVlanEnabled && port.type === 'access' && (
                                     <TextField
                                         margin="dense"
                                         label="VLAN ID"
                                         type="number"
                                         value={port.accessVlan || ''}
-                                        onChange={e => handlePortChange(index, 'accessVlan', Number(e.target.value))}
+                                        onChange={(e) => handlePortChange(index, 'accessVlan', Number(e.target.value))}
                                         fullWidth
                                         required
                                         error={!!portVlanErrors[index]}
@@ -455,13 +530,15 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                                 {port.isVlanEnabled && port.type === 'trunk' && (
                                     <TextField
                                         margin="dense"
-                                        label="Allowed VLANs"
+                                        label="Разрешённые VLAN"
                                         value={port.allowedVlanList ? port.allowedVlanList.join(',') : ''}
-                                        onChange={e => handlePortChange(index, 'allowedVlanList', e.target.value)}
+                                        onChange={(e) => handlePortChange(index, 'allowedVlanList', e.target.value)}
                                         fullWidth
                                         required
                                         error={!!portAllowedVlanErrors[index]}
-                                        helperText={portAllowedVlanErrors[index] || 'Введите VLAN IDs через запятую (например, 10,20,30)'}
+                                        helperText={
+                                            portAllowedVlanErrors[index] || 'Введите VLAN IDs через запятую (например, 10,20,30)'
+                                        }
                                         inputProps={{ pattern: '[0-9,]*' }}
                                     />
                                 )}
@@ -474,54 +551,59 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                             <TextField
                                 margin="dense"
                                 name="ip_address"
-                                label="Host IP Address"
+                                label="IP-адрес хоста"
                                 fullWidth
                                 value={formData.ip_address}
                                 onChange={handleChange}
                                 required
-                                error={!formData.ip_address}
-                                helperText={!formData.ip_address ? 'IP-адрес обязателен' : ''}
+                                error={submitAttempted && !formData.ip_address}
+                                helperText={submitAttempted && !formData.ip_address ? 'IP-адрес обязателен' : ''}
+                                sx={{ mt: 2, ...formStyles }}
                             />
                             <TextField
                                 margin="dense"
                                 name="mac_address"
-                                label="MAC Address"
+                                label="MAC-адрес"
                                 fullWidth
                                 value={formData.mac_address}
                                 onChange={handleChange}
                                 required
-                                error={!formData.mac_address}
-                                helperText={!formData.mac_address ? 'MAC-адрес обязателен' : ''}
+                                error={submitAttempted && !formData.mac_address}
+                                helperText={submitAttempted && !formData.mac_address ? 'MAC-адрес обязателен' : ''}
+                                sx={{ mt: 2, ...formStyles }}
                             />
                             <TextField
                                 margin="dense"
                                 name="gateway"
-                                label="Gateway"
+                                label="Шлюз"
                                 fullWidth
                                 value={formData.gateway}
                                 onChange={handleChange}
                                 required
-                                error={!formData.gateway}
-                                helperText={!formData.gateway ? 'Шлюз обязателен' : ''}
+                                error={submitAttempted && !formData.gateway}
+                                helperText={submitAttempted && !formData.gateway ? 'Шлюз обязателен' : ''}
+                                sx={{ mt: 2, ...formStyles }}
                             />
                         </>
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={onClose} color="secondary">
-                        Cancel
+                    <Button onClick={onClose} sx={{ color: "var(--detail-gray)" }}>
+                        Отмена
                     </Button>
                     <Button
                         type="submit"
-                        color="primary"
                         disabled={
                             !deviceType ||
-                            portNameErrors.some(e => !!e) ||
-                            portVlanErrors.some(e => !!e) ||
-                            portAllowedVlanErrors.some(e => !!e)
+                            (submitAttempted && (
+                                portNameErrors.some((e) => !!e) ||
+                                portVlanErrors.some((e) => !!e) ||
+                                portAllowedVlanErrors.some((e) => !!e)
+                            ))
                         }
+                        sx={{ color: 'var(--text-gray)' }}
                     >
-                        Save
+                        Сохранить
                     </Button>
                 </DialogActions>
             </form>

@@ -106,7 +106,13 @@ export const ContextMenuPopover = ({ device, anchorEl, setAnchorEl }: PortsModal
                 horizontal: 'left',
             }}
             PaperProps={{
-                sx: { width: 300 }
+                sx: { width: 500 }
+            }}
+            sx={{
+                '& .MuiPopover-paper': {
+                    backgroundColor: '#181C22',
+                    color: 'white'
+                }
             }}
         >
             <Box sx={{ p: 2 }}>
@@ -115,7 +121,7 @@ export const ContextMenuPopover = ({ device, anchorEl, setAnchorEl }: PortsModal
                         <Button
                             onClick={() => setChoice(null)}
                             startIcon={<ArrowBack />}
-                            sx={{ mb: 2 }}
+                            sx={{ mb: 2, color: 'white' }}
                         >
                             Назад
                         </Button>

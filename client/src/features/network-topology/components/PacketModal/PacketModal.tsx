@@ -1,4 +1,3 @@
-
 import { Box, Button, MenuItem, MenuList, TextField, Typography, RadioGroup, FormControlLabel, Radio } from '@mui/material';
 import { Device, NetworkPacket } from '../../types';
 import { useState } from 'react';
@@ -9,7 +8,7 @@ interface PacketModalProps {
     handlePopoverClose: () => void;
 }
 
-type PacketType = 'normal' | 'ARP' | 'PING';;
+type PacketType = 'normal' | 'ARP' | 'PING';
 
 const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
     const [destMAC, setDestMAC] = useState('');
@@ -20,10 +19,57 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
     const [arpTargetIp, setArpTargetIp] = useState('');
     const { addPacket, devices } = useNetworkStore();
 
+    const formStyles = {
+        '& .MuiInputBase-input': {
+            color: 'white',
+        },
+        '& .MuiOutlinedInput-root': {
+            '& fieldset': {
+                borderColor: 'rgba(229, 231, 235, 0.5)',
+            },
+            '&:hover fieldset': {
+                borderColor: '#8053b0',
+            },
+            '&.Mui-focused fieldset': {
+                borderColor: '#8053b0',
+            },
+        },
+        '& .MuiInputLabel-root': {
+            color: 'rgba(229, 231, 235, 0.5)',
+            '&.Mui-focused': {
+                color: '#8053b0',
+            },
+        },
+        '& .MuiFormHelperText-root': {
+            color: 'rgba(229, 231, 235, 0.5)',
+            '&.Mui-error': {
+                color: '#f44336',
+            },
+        },
+        '& .MuiRadio-root': {
+            color: 'rgba(229, 231, 235, 0.5)',
+            '&.Mui-checked': {
+                color: '#8053b0',
+            },
+        },
+        '& .MuiMenuItem-root': {
+            color: 'white',
+            '&.Mui-selected': {
+                backgroundColor: '#8053b0',
+                '&:hover': {
+                    backgroundColor: '#8053b0',
+                },
+            },
+            '&:hover': {
+                backgroundColor: '#8053b080',
+            },
+        },
+    };
+
     const connectedPorts =
         device.ports?.filter(
             (port) => port.connectedTo?.deviceId && devices[port.connectedTo.deviceId]
-        ) || [];
+        ) ?? [];
 
     const validateMac = (mac: string): boolean => {
         const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
@@ -55,9 +101,8 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
         }
 
         const sourceMAC =
-            device.type === 'host' ? device.mac_address : sourcePort.mac_address || '';
+            device.type === 'host' ? device.mac_address : sourcePort.mac_address ?? '';
 
-        // --- VLAN: если порт access и включён VLAN, сразу ставим vlanId ---
         let vlanId: number | undefined = undefined;
         if (sourcePort.isVlanEnabled && sourcePort.type === 'access') {
             vlanId = sourcePort.accessVlan;
@@ -71,6 +116,8 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
                 return;
             }
             packet = {
+
+
                 id: crypto.randomUUID(),
                 path: [],
                 currentHop: 0,
@@ -84,8 +131,8 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
                     senderIp: device.ip_address,
                 }),
                 ttl: 64,
-                x: device.x || 0,
-                y: device.y || 0,
+                x: device.x ?? 0,
+                y: device.y ?? 0,
                 isResponse: false,
                 isFlooded: true,
                 type: 'ARP',
@@ -108,8 +155,8 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
                 destMAC,
                 payload: JSON.stringify({ type: "PING-REQUEST" }),
                 ttl: 64,
-                x: device.x || 0,
-                y: device.y || 0,
+                x: device.x ?? 0,
+                y: device.y ?? 0,
                 isResponse: false,
                 isFlooded: false,
                 type: "PING",
@@ -128,12 +175,12 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
                 destMAC,
                 payload,
                 ttl: 64,
-                x: device.x || 0,
-                y: device.y || 0,
+                x: device.x ?? 0,
+                y: device.y ?? 0,
                 isResponse: false,
                 isFlooded: destMAC === 'FF:FF:FF:FF:FF:FF',
                 type: 'DATA',
-                vlanId, // <-- вот тут!
+                vlanId,
             };
         }
 
@@ -154,22 +201,56 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
     };
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: 300 }}>
-            <Typography variant='h6'>Отправка пакета</Typography>
+        <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            width: 500,
+            backgroundColor: '#181C22',
+            color: 'white',
+            ...formStyles,
+            pr: 4,
+
+        }}>
+            <Typography variant='h6' sx={{ color: 'white' }}>Отправка пакета</Typography>
 
             <RadioGroup
                 row
                 value={packetType}
                 onChange={(e) => setPacketType(e.target.value as PacketType)}
+                sx={{ mb: 2 }}
             >
-                <FormControlLabel value="normal" control={<Radio />} label="Обычный пакет" />
-                <FormControlLabel value="ARP" control={<Radio />} label="ARP-запрос" />
-                <FormControlLabel value="PING" control={<Radio />} label="Ping" />
+                <FormControlLabel
+                    value="normal"
+                    control={<Radio />}
+                    label="Обычный пакет"
+                    sx={{ color: 'rgba(229, 231, 235, 0.5)' }}
+                />
+                <FormControlLabel
+                    value="ARP"
+                    control={<Radio />}
+                    label="ARP-запрос"
+                    sx={{ color: 'rgba(229, 231, 235, 0.5)' }}
+                />
+                <FormControlLabel
+                    value="PING"
+                    control={<Radio />}
+                    label="Ping"
+                    sx={{ color: 'rgba(229, 231, 235, 0.5)' }}
+                />
             </RadioGroup>
 
             <Box>
-                <Typography variant='subtitle2'>Исходящий порт:</Typography>
-                <MenuList>
+                <Typography variant='subtitle2' sx={{ color: 'rgba(229, 231, 235, 0.5)', mb: 1 }}>
+                    Исходящий порт:
+                </Typography>
+                <MenuList sx={{
+                    border: '1px solid rgba(229, 231, 235, 0.5)',
+                    borderRadius: 1,
+                    p: 0,
+                    maxHeight: 200,
+                    overflow: 'auto'
+                }}>
                     {connectedPorts.map((port) => {
                         if (!port.connectedTo?.deviceId) return null;
                         const targetDevice = devices[port.connectedTo.deviceId];
@@ -179,13 +260,18 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
                                 selected={port.id === selectedPortId}
                                 onClick={() => setSelectedPortId(port.id)}
                                 sx={{
-                                    bgcolor: port.id === selectedPortId ? '#f5f5f5' : 'inherit',
-                                    borderRadius: 1,
+                                    color: 'white',
+                                    '&.Mui-selected': {
+                                        backgroundColor: '#8053b0',
+                                    },
+                                    '&:hover': {
+                                        backgroundColor: '#8053b080',
+                                    },
                                 }}
                             >
                                 <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                                     <Typography>{port.name}</Typography>
-                                    <Typography variant='caption' color='text.secondary'>
+                                    <Typography variant='caption' sx={{ color: 'rgba(229, 231, 235, 0.7)' }}>
                                         Подключён к: {targetDevice?.name} ({targetDevice?.type})
                                     </Typography>
                                 </Box>
@@ -204,6 +290,8 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
                     helperText={macError}
                     size='small'
                     placeholder='FF:FF:FF:FF:FF:FF для широковещания'
+                    fullWidth
+                    sx={formStyles}
                 />
             )}
 
@@ -214,17 +302,22 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
                     onChange={(e) => setArpTargetIp(e.target.value)}
                     size="small"
                     required
+                    fullWidth
+                    sx={formStyles}
                 />
             )}
+
             {packetType === 'PING' && (
                 <TextField
-                    label='MAC назначения (или IP, если реализуешь)'
+                    label='MAC назначения'
                     value={destMAC}
                     onChange={(e) => handleMacChange(e.target.value)}
                     error={!!macError}
                     helperText={macError}
                     size='small'
                     placeholder='MAC-адрес получателя'
+                    fullWidth
+                    sx={formStyles}
                 />
             )}
 
@@ -241,6 +334,8 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
                 multiline
                 rows={3}
                 disabled={packetType === 'ARP' || packetType === 'PING'}
+                fullWidth
+                sx={formStyles}
             />
 
             <Button
@@ -251,6 +346,17 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
                     (packetType === 'normal' && !!macError) ||
                     (packetType === 'ARP' && !arpTargetIp)
                 }
+                sx={{
+                    mt: 2,
+                    backgroundColor: '#8053b0',
+                    '&:hover': {
+                        backgroundColor: '#6a4299',
+                    },
+                    '&:disabled': {
+                        backgroundColor: 'rgba(229, 231, 235, 0.1)',
+                        color: 'rgba(229, 231, 235, 0.3)',
+                    }
+                }}
             >
                 Отправить
             </Button>

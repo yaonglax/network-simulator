@@ -8,7 +8,6 @@ function App() {
 
   useEffect(() => {
     const handleFocusInputs = () => {
-      // Находим первый инпут в модалке или на странице
       const input = document.querySelector('input, textarea, select, [contenteditable]');
       if (input) {
         input.focus();
@@ -16,10 +15,9 @@ function App() {
         setTimeout(() => input.focus(), 50);
       }
     };
-  
-    // Подписываемся на событие из main process
+
     window.electronAPI?.ipcRenderer?.on('focus-inputs', handleFocusInputs);
-    
+
     return () => {
       window.electronAPI?.ipcRenderer?.off('focus-inputs', handleFocusInputs);
     };
@@ -28,7 +26,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<WelcomePage />} />
-        <Route path='/editor' element={<NetworkEditorPage />}/>
+        <Route path='/editor' element={<NetworkEditorPage />} />
       </Routes>
     </Router>
   )

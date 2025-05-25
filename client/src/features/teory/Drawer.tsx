@@ -1,0 +1,134 @@
+import { useState, useEffect } from 'react';
+import { useTheme, Theme } from '@mui/material/styles';
+import {
+    Box,
+    Button,
+    Divider,
+    Drawer,
+    List,
+    ListItem,
+    ListItemButton,
+    ListItemText,
+    styled
+} from "@mui/material";
+import {
+    ChevronLeft as ChevronLeftIcon,
+    ChevronRight as ChevronRightIcon,
+    ArrowForward as ArrowForwardIcon
+} from "@mui/icons-material";
+
+interface OverlayProps {
+    open: boolean;
+    theme?: Theme;
+}
+
+const DrawerHeader = styled('div')(({ theme }) => ({
+    display: 'flex',
+    alignItems: 'center',
+    padding: theme.spacing(0, 1),
+    justifyContent: 'flex-end',
+}));
+
+const Overlay = styled('div')<OverlayProps>(({ open }) => ({
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 1099,
+    opacity: open ? 1 : 0,
+    visibility: open ? 'visible' : 'hidden',
+    transition: 'opacity 0.3s, visibility 0.3s',
+}));
+
+export default function PersistentDrawerLeft() {
+    const [open, setOpen] = useState(false);
+    const theme = useTheme();
+
+    const handleDrawerToggle = () => {
+        setOpen(!open);
+    };
+
+    useEffect(() => {
+        if (open) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [open]);
+
+    return (
+        <>
+            <Overlay open={open} onClick={handleDrawerToggle} />
+
+            {/* Заменили Button на Box с IconButton внутри для лучшего контроля */}
+            <Box
+                sx={{
+                    position: 'fixed',
+                    left: 0,
+                    top: '50%',
+                    width: '20px',
+                    height: '55px',
+                    zIndex: 1201,
+                    backgroundColor: 'var(--element-gray)',
+                    '&:hover': {
+                        backgroundColor: 'var(--detail-gray)',
+                    },
+                    transform: open ? 'translateX(250px)' : 'none',
+                    transition: theme.transitions.create('transform', {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.enteringScreen,
+                    }),
+                    clipPath: 'polygon(0 0, 100% 25%, 100% 75%, 0 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                }}
+                onClick={handleDrawerToggle}
+                aria-label="toggle drawer"
+            >
+                {open ? <ChevronLeftIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+            </Box>
+
+            <Drawer
+                sx={{
+                    width: 250,
+                    flexShrink: 0,
+                    '& .MuiDrawer-paper': {
+                        width: 250,
+                        boxSizing: 'border-box',
+                        position: 'fixed',
+                        zIndex: 1200,
+                        height: '100vh',
+                        left: 0,
+                        transform: open ? 'translateX(0)' : 'translateX(-100%)',
+                        transition: theme.transitions.create('transform', {
+                            easing: theme.transitions.easing.sharp,
+                            duration: theme.transitions.duration.enteringScreen,
+                        }),
+                    },
+                }}
+                variant="persistent"
+                anchor="left"
+                open={open}
+            >
+                <DrawerHeader />
+                <Divider />
+                <List>
+                    {['Теория сетей', 'Типы устройств', 'Примеры конфигураций'].map((text) => (
+                        <ListItem key={text} disablePadding>
+                            <ListItemButton>
+                                <ListItemText primary={text} />
+                            </ListItemButton>
+                        </ListItem>
+                    ))}
+                </List>
+            </Drawer>
+        </>
+    );
+}

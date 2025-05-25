@@ -55,6 +55,9 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 1500,
   },
+  css: {
+    postcss: "./postcss.config.mjs",
+  },
   optimizeDeps: {
     include: [
       "@emotion/react",

@@ -2,6 +2,8 @@ import React from 'react';
 import Button from '@mui/material/Button';
 import { useNetworkStore, NetworkTopology } from '../../store/network-store';
 import { fileStorage } from '../../store/electronStorage';
+import { purple } from '@mui/material/colors';
+import { bgcolor } from '@mui/system';
 
 
 export function SaveLoadControls() {
@@ -78,18 +80,35 @@ export function SaveLoadControls() {
     };
 
     return (
-        <div style={{ margin: '16px 0', display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexDirection: 'row' }}>
             <Button
                 variant="contained"
-                color="primary"
                 onClick={handleSave}
+                sx={{
+                    backgroundColor: 'var(--detail-gray)',
+                    color: 'var(--contrast-white)',
+                    minWidth: '20px',
+                    minHeight: '12px',
+                    width: '210px',
+                    height: '50px',
+                    borderRadius: '0.5rem',
+                    '&:hover': { bgcolor: 'var(--hover-purple)', border: '1px solid var(--highlight-purple)', boxShadow: '0px 0px 1px var(--highlight-purple)' },
+                }}
             >
                 Сохранить топологию
             </Button>
             <Button
-                variant="outlined"
-                color="primary"
                 onClick={handleLoad}
+                sx={{
+                    backgroundColor: 'var(--detail-gray)',
+                    color: 'var(--contrast-white)',
+                    minWidth: '20px',
+                    minHeight: '12px',
+                    width: '210px',
+                    height: '50px',
+                    borderRadius: '0.5rem',
+                    '&:hover': { bgcolor: 'var(--hover-purple)', border: '1px solid var(--highlight-purple)', boxShadow: '0px 0px 1px var(--highlight-purple)' },
+                }}
             >
                 Загрузить топологию
             </Button>

@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useLayoutEffect, useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { HelpOutline, MailOutline } from '@mui/icons-material';
 import { useNetworkStore } from '../../store/network-store';
@@ -11,24 +11,50 @@ interface PacketEntityProps {
 const PacketEntity = ({ packetId, isPlaying }: PacketEntityProps) => {
     const packet = useNetworkStore((state) => state.packets[packetId]);
     const devices = useNetworkStore((state) => state.devices);
+    const canvasRef = useRef<HTMLElement | null>(null);
+    const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+    const packetRef = useRef<HTMLDivElement | null>(null);
 
-    // --- Защита: если пакета нет — не рендерим и не вызываем хуки ---
+    useLayoutEffect(() => {
+        const canvas = document.getElementById('network-canvas');
+        const updateOffset = () => {
+            if (canvas) {
+                canvasRef.current = canvas;
+                setCanvasOffset({ x: canvas.offsetLeft, y: canvas.offsetTop });
+            } else {
+                console.warn('Network canvas not found, cannot update offset');
+            }
+        };
+        updateOffset();
+        window.addEventListener('resize', updateOffset);
+        return () => window.removeEventListener('resize', updateOffset);
+    }, []);
+
     if (!packet) {
         console.warn(`Packet ${packetId} not found, skipping render`);
         return null;
     }
 
-    // Все хуки — до любых return ниже!
     const currentPosition = useMemo(() => {
-        let lastValid = { x: packet.x ?? 0, y: packet.y ?? 0 };
+        if (!packet.path || packet.path.length === 0) {
+            return { x: (packet.x ?? 0) + 25, y: (packet.y ?? 0) + 25 }; // Только центрирование, без canvasOffset
+        }
+
+        let lastValid = { x: (packet.x ?? 0) + 25, y: (packet.y ?? 0) + 25 };
         const points = packet.path.map((hop) => {
             const device = devices[hop.deviceId];
             if (!device || device.x === undefined || device.y === undefined) {
                 return lastValid;
             }
-            lastValid = { x: device.x + 25, y: device.y + 25 };
+            lastValid = { x: device.x + 25, y: device.y + 25 }; // Только центрирование
             return lastValid;
         });
+
+        if (packet.currentHop >= points.length) {
+            return points.length > 0
+                ? points[points.length - 1]
+                : { x: (packet.x ?? 0) + 25, y: (packet.y ?? 0) + 25 };
+        }
         return points[packet.currentHop];
     }, [devices, packet.path, packet.currentHop, packet.x, packet.y]);
 
@@ -39,15 +65,33 @@ const PacketEntity = ({ packetId, isPlaying }: PacketEntityProps) => {
             isPlaying,
             path: packet.path?.map((hop) => hop.deviceId),
             type: packet.type,
+            position: currentPosition,
+            canvasOffset,
+            initialPacketPosition: { x: packet.x, y: packet.y },
         });
-    }, [packetId, packet.currentHop, packet.isFlooded, isPlaying, packet.path, packet.type]);
+
+        if (packetRef.current) {
+            const parentElement = packetRef.current.parentElement;
+            if (parentElement) {
+                console.log(`Parent of packet ${packetId}:`, {
+                    tagName: parentElement.tagName,
+                    id: parentElement.id,
+                    className: parentElement.className,
+                    offsetLeft: parentElement.offsetLeft,
+                    offsetTop: parentElement.offsetTop,
+                    clientRect: parentElement.getBoundingClientRect(),
+                });
+            } else {
+                console.warn(`No parent found for packet ${packetId}`);
+            }
+        }
+    }, [packetId, packet.currentHop, packet.isFlooded, isPlaying, packet.path, packet.type, currentPosition, canvasOffset]);
 
     const { packetColor, packetIcon } = useMemo(() => {
         if (packet.type === 'ARP') {
             if (packet.isResponse) {
                 return { packetColor: '#4caf50', packetIcon: <MailOutline fontSize="small" /> };
-            }
-            else {
+            } else {
                 return { packetColor: '#ff9800', packetIcon: <HelpOutline fontSize="small" /> };
             }
         } else if (packet.isFlooded) {
@@ -59,15 +103,8 @@ const PacketEntity = ({ packetId, isPlaying }: PacketEntityProps) => {
         }
     }, [packet.type, packet.isResponse, packet.isFlooded]);
 
-    // --- Защита: если path некорректен — не рендерим ---
-    if (
-        !Array.isArray(packet.path) ||
-        packet.currentHop == null ||
-        packet.currentHop >= packet.path.length
-    ) {
-        return null;
-    }
     if (!currentPosition || typeof currentPosition.x !== 'number' || typeof currentPosition.y !== 'number') {
+        console.warn(`Invalid position for packet ${packetId}:`, currentPosition);
         return null;
     }
 
@@ -75,10 +112,7 @@ const PacketEntity = ({ packetId, isPlaying }: PacketEntityProps) => {
         playing: {
             x: currentPosition.x,
             y: currentPosition.y,
-            transition: {
-                duration: 1.5,
-                ease: 'linear',
-            },
+            transition: { duration: 1.5, ease: 'linear' },
         },
         stopped: {
             x: currentPosition.x,
@@ -90,6 +124,7 @@ const PacketEntity = ({ packetId, isPlaying }: PacketEntityProps) => {
 
     return (
         <motion.div
+            ref={packetRef}
             key={packet.id}
             initial={{
                 x: currentPosition.x,

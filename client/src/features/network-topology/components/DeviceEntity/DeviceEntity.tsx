@@ -93,7 +93,7 @@ export const DeviceEntity: React.FC<DeviceEntityProps> = ({ device, onContextMen
             }}
         >
             {ICON_MAP[device.type]}
-            <Typography variant="caption">{device.name}</Typography>
+            <Typography variant="caption" sx={{ color: 'white' }}>{device.name}</Typography>
         </Box>
     )
 }
