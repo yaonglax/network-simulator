@@ -1,6 +1,7 @@
 import { HashRouter as Router, Route, Routes } from 'react-router-dom'
 import WelcomePage from './pages/welcomePage/WelcomePage'
 import NetworkEditorPage from './pages/networkEditorPage/NetworkEditorPage'
+import TheoryPage from './pages/TheoryPage'
 import './styles/main.css'
 import { useEffect } from 'react';
 
@@ -27,6 +28,7 @@ function App() {
       <Routes>
         <Route path="/" element={<WelcomePage />} />
         <Route path='/editor' element={<NetworkEditorPage />} />
+        <Route path='/theory' element={<TheoryPage />} />
       </Routes>
     </Router>
   )

@@ -49,6 +49,8 @@ export interface NetworkPacket {
   type?: string;
   arpReplyPending?: boolean;
   sentAt?: number;
+  isProcessed: boolean;
+  isPlaying: boolean;
 }
 
 export interface MacTableEntry {

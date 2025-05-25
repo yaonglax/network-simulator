@@ -14,13 +14,18 @@ const PacketEntity = ({ packetId, isPlaying }: PacketEntityProps) => {
     const canvasRef = useRef<HTMLElement | null>(null);
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
     const packetRef = useRef<HTMLDivElement | null>(null);
+    const [animationComplete, setAnimationComplete] = useState(true); // Track animation status
 
     useLayoutEffect(() => {
         const canvas = document.getElementById('network-canvas');
         const updateOffset = () => {
             if (canvas) {
                 canvasRef.current = canvas;
-                setCanvasOffset({ x: canvas.offsetLeft, y: canvas.offsetTop });
+                const newOffset = { x: canvas.offsetLeft, y: canvas.offsetTop };
+                setCanvasOffset((prev) => {
+                    if (prev.x !== newOffset.x || prev.y !== newOffset.y) return newOffset;
+                    return prev;
+                });
             } else {
                 console.warn('Network canvas not found, cannot update offset');
             }
@@ -37,7 +42,7 @@ const PacketEntity = ({ packetId, isPlaying }: PacketEntityProps) => {
 
     const currentPosition = useMemo(() => {
         if (!packet.path || packet.path.length === 0) {
-            return { x: (packet.x ?? 0) + 25, y: (packet.y ?? 0) + 25 }; // Только центрирование, без canvasOffset
+            return { x: (packet.x ?? 0) + 25, y: (packet.y ?? 0) + 25 };
         }
 
         let lastValid = { x: (packet.x ?? 0) + 25, y: (packet.y ?? 0) + 25 };
@@ -46,7 +51,7 @@ const PacketEntity = ({ packetId, isPlaying }: PacketEntityProps) => {
             if (!device || device.x === undefined || device.y === undefined) {
                 return lastValid;
             }
-            lastValid = { x: device.x + 25, y: device.y + 25 }; // Только центрирование
+            lastValid = { x: device.x + 25, y: device.y + 25 };
             return lastValid;
         });
 
@@ -63,29 +68,14 @@ const PacketEntity = ({ packetId, isPlaying }: PacketEntityProps) => {
             currentHop: packet.currentHop,
             isFlooded: packet.isFlooded,
             isPlaying,
+            animationComplete,
             path: packet.path?.map((hop) => hop.deviceId),
             type: packet.type,
             position: currentPosition,
             canvasOffset,
             initialPacketPosition: { x: packet.x, y: packet.y },
         });
-
-        if (packetRef.current) {
-            const parentElement = packetRef.current.parentElement;
-            if (parentElement) {
-                console.log(`Parent of packet ${packetId}:`, {
-                    tagName: parentElement.tagName,
-                    id: parentElement.id,
-                    className: parentElement.className,
-                    offsetLeft: parentElement.offsetLeft,
-                    offsetTop: parentElement.offsetTop,
-                    clientRect: parentElement.getBoundingClientRect(),
-                });
-            } else {
-                console.warn(`No parent found for packet ${packetId}`);
-            }
-        }
-    }, [packetId, packet.currentHop, packet.isFlooded, isPlaying, packet.path, packet.type, currentPosition, canvasOffset]);
+    }, [packetId, packet.currentHop, packet.isFlooded, isPlaying, animationComplete, packet.path, packet.type, currentPosition, canvasOffset]);
 
     const { packetColor, packetIcon } = useMemo(() => {
         if (packet.type === 'ARP') {
@@ -132,6 +122,8 @@ const PacketEntity = ({ packetId, isPlaying }: PacketEntityProps) => {
             }}
             variants={variants}
             animate={isPlaying ? 'playing' : 'stopped'}
+            onAnimationStart={() => setAnimationComplete(false)}
+            onAnimationComplete={() => setAnimationComplete(true)}
             style={{
                 position: 'absolute',
                 zIndex: 1000,

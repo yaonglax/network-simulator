@@ -7,7 +7,7 @@ import {
   MacTableEntry,
 } from "../types";
 
-const MAC_TABLE_ENTRY_TTL = 300_000; // 5 минут
+const MAC_TABLE_ENTRY_TTL = 300_000; // 5 minutes
 let simulationTimeout: ReturnType<typeof setTimeout> | null = null;
 let macAgingInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -64,45 +64,63 @@ function buildPathBFS(
   connections: Connection[]
 ): Array<{ deviceId: string; portId: string; process: any }> | null {
   type Hop = { deviceId: string; portId: string; prev?: Hop };
-  const visited = new Set<string>();
+  const visited = new Set<string>(); // Track deviceId:portId
   const queue: Hop[] = [];
 
   const fromDevice = devices[fromDeviceId];
-  if (!fromDevice) return null;
+  if (!fromDevice) {
+    console.log(
+      `[DEBUG] buildPathBFS: Source device ${fromDeviceId} not found`
+    );
+    return null;
+  }
+
+  // Initialize queue with ports of the starting device
   for (const port of fromDevice.ports) {
-    queue.push({ deviceId: fromDeviceId, portId: port.id });
-    visited.add(`${fromDeviceId}:${port.id}`);
+    if (port.connectedTo) {
+      queue.push({ deviceId: fromDeviceId, portId: port.id });
+      visited.add(`${fromDeviceId}:${port.id}`);
+    }
   }
 
   let found: Hop | null = null;
   while (queue.length > 0) {
     const hop = queue.shift()!;
+    console.log(`[DEBUG] buildPathBFS: Visiting ${hop.deviceId}:${hop.portId}`);
+
     if (hop.deviceId === toDeviceId) {
       found = hop;
       break;
     }
+
+    // Check connections, interpreting them as bidirectional
     for (const conn of connections) {
       let nextDeviceId: string | null = null;
       let nextPortId: string | null = null;
+
+      // Forward direction
       if (
         conn.from.deviceId === hop.deviceId &&
         conn.from.portId === hop.portId
       ) {
         nextDeviceId = conn.to.deviceId;
         nextPortId = conn.to.portId;
-      } else if (
+      }
+      // Reverse direction
+      else if (
         conn.to.deviceId === hop.deviceId &&
         conn.to.portId === hop.portId
       ) {
         nextDeviceId = conn.from.deviceId;
         nextPortId = conn.from.portId;
       }
-      if (
-        nextDeviceId &&
-        nextPortId &&
-        !visited.has(`${nextDeviceId}:${nextPortId}`)
-      ) {
-        visited.add(`${nextDeviceId}:${nextPortId}`);
+
+      const hopKey = `${nextDeviceId}:${nextPortId}`;
+      if (nextDeviceId && nextPortId && !visited.has(hopKey)) {
+        console.log(
+          `[DEBUG] buildPathBFS: Adding to queue ${nextDeviceId}:${nextPortId} (from ${hop.deviceId}:${hop.portId})`
+        );
+        visited.add(hopKey);
         queue.push({
           deviceId: nextDeviceId,
           portId: nextPortId,
@@ -111,7 +129,18 @@ function buildPathBFS(
       }
     }
   }
-  if (!found) return null;
+
+  if (!found) {
+    console.log(
+      `[DEBUG] buildPathBFS: No path found from ${fromDeviceId} to ${toDeviceId}, visited:`,
+      Array.from(visited),
+      "Connections:",
+      connections
+    );
+    return null;
+  }
+
+  // Build the path
   const path: Array<{ deviceId: string; portId: string; process: any }> = [];
   let cur: Hop | undefined = found;
   while (cur) {
@@ -122,11 +151,12 @@ function buildPathBFS(
     });
     cur = cur.prev;
   }
+  console.log(`[DEBUG] buildPathBFS: Found path:`, path);
   return path;
 }
 
 /**
- * Универсальный path для ARP-ответа между двумя хостами
+ * Universal path for ARP reply between two hosts
  */
 function buildArpReplyPath(
   fromDevice: Device,
@@ -134,17 +164,119 @@ function buildArpReplyPath(
   devices: Record<string, Device>,
   connections: Connection[]
 ): Array<{ deviceId: string; portId: string; process: any }> {
-  const path = buildPathBFS(fromDevice.id, toDevice.id, devices, connections);
-  if (!path) {
-    return [
-      {
-        deviceId: fromDevice.id,
-        portId: fromDevice.ports[0]?.id || "eth0",
-        process: () => {},
-      },
-    ];
+  let path = buildPathBFS(fromDevice.id, toDevice.id, devices, connections);
+  console.log(
+    `[DEBUG] ARP Reply Path from ${fromDevice.id} to ${toDevice.id}:`,
+    path,
+    "Connections:",
+    connections
+  );
+
+  if (!path || path.length < 2) {
+    const pathMap: Map<
+      string,
+      { deviceId: string; portId: string; prev?: string }
+    > = new Map();
+    const queue: string[] = [fromDevice.id];
+    const visited = new Set<string>([fromDevice.id]);
+    let foundTarget = false;
+
+    while (queue.length > 0 && !foundTarget) {
+      const currentDeviceId = queue.shift()!;
+      const currentDevice = devices[currentDeviceId];
+
+      for (const port of currentDevice.ports) {
+        if (port.connectedTo) {
+          const nextDeviceId = port.connectedTo.deviceId;
+          const nextPortId = port.connectedTo.portId;
+          const key = `${nextDeviceId}:${nextPortId}`;
+
+          if (!visited.has(nextDeviceId)) {
+            console.log(
+              `[DEBUG] buildArpReplyPath: Adding ${nextDeviceId}:${nextPortId} from ${currentDeviceId}:${port.id}`
+            );
+            visited.add(nextDeviceId);
+            pathMap.set(key, {
+              deviceId: nextDeviceId,
+              portId: nextPortId,
+              prev: `${currentDeviceId}:${port.id}`,
+            });
+            queue.push(nextDeviceId);
+
+            if (nextDeviceId === toDevice.id) {
+              foundTarget = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    path = [];
+    let currentKey = foundTarget
+      ? `${toDevice.id}:${toDevice.ports[0]?.id || "eth0"}`
+      : null;
+    while (currentKey) {
+      const step = pathMap.get(currentKey);
+      if (step) {
+        path.unshift({
+          deviceId: step.deviceId,
+          portId: step.portId,
+          process: () => {},
+        });
+        currentKey = step.prev;
+      } else {
+        break;
+      }
+    }
+
+    if (path.length > 0) {
+      const fromPort = fromDevice.ports.find(
+        (p) => p.connectedTo?.deviceId === path[0].deviceId
+      );
+      if (fromPort) {
+        path.unshift({
+          deviceId: fromDevice.id,
+          portId: fromPort.id,
+          process: () => {},
+        });
+      }
+    } else {
+      console.log(
+        `[DEBUG] buildArpReplyPath: No valid path found, using default`
+      );
+      path = [
+        {
+          deviceId: fromDevice.id,
+          portId: fromDevice.ports[0]?.id || "eth0",
+          process: () => {},
+        },
+        {
+          deviceId: toDevice.id,
+          portId: toDevice.ports[0]?.id || "eth0",
+          process: () => {},
+        },
+      ];
+    }
   }
-  return path;
+
+  // Remove duplicates while preserving order
+  const uniquePath: Array<{ deviceId: string; portId: string; process: any }> =
+    [];
+  const seenDevices = new Set<string>();
+  for (const step of path) {
+    if (!seenDevices.has(step.deviceId)) {
+      seenDevices.add(step.deviceId);
+      uniquePath.push(step);
+    }
+  }
+
+  console.log(`[DEBUG] buildArpReplyPath: Final path:`, uniquePath);
+  return uniquePath.map((step) => ({
+    deviceId: step.deviceId,
+    portId: step.portId,
+    process: (p: NetworkPacket, devId: string) => {},
+  }));
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -204,13 +336,14 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         },
       };
     }),
+
   removeDevice: (deviceId: string) =>
     set((state) => {
-      // Удаляем устройство
+      // Remove device
       const newDevices = { ...state.devices };
       delete newDevices[deviceId];
 
-      // Удаляем все соединения, связанные с этим устройством
+      // Remove all connections related to this device
       const newConnections = state.connections
         ? state.connections.filter(
             (conn) =>
@@ -218,7 +351,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
           )
         : [];
 
-      // Создаём новый объект устройств с очищенными портами
+      // Create new devices object with cleaned ports
       const cleanedDevices: typeof newDevices = {};
       Object.entries(newDevices).forEach(([id, device]) => {
         cleanedDevices[id] = {
@@ -236,6 +369,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         connections: newConnections,
       };
     }),
+
   connectPorts: (from: Port, to: Port) =>
     set((state) => {
       const fromDevice = state.devices[from.deviceId];
@@ -244,6 +378,24 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         console.warn(`Device ${from.deviceId} or ${to.deviceId} not found`);
         return state;
       }
+
+      // Check VLAN compatibility
+      const isVlanCompatible = checkVlanCompatibility(
+        from,
+        to,
+        fromDevice,
+        toDevice
+      );
+      if (!isVlanCompatible) {
+        alert(
+          `VLAN mismatch: port ${from.name} (VLAN ${getPortVlan(
+            from
+          )}) cannot be connected to port ${to.name} (VLAN ${getPortVlan(to)}).`
+        );
+        window.electronAPI?.focus.forceFocus();
+        return state;
+      }
+
       const connectionId = `conn-${Date.now()}`;
       const newConnections = [
         ...state.connections,
@@ -327,7 +479,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         );
         return state;
       }
-      // VLAN: если порт access и включён VLAN, сразу ставим vlanId
+      // VLAN: if port is access and VLAN is enabled, set vlanId
       let effectiveVlanId = packet.vlanId;
       if (
         sourcePort.isVlanEnabled &&
@@ -360,6 +512,8 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         ttl: packet.ttl ?? 64,
         visited: packet.visited ?? new Set<string>(),
         vlanId: effectiveVlanId,
+        isProcessed: false,
+        isPlaying: false, // Added to satisfy type
       };
       return {
         packets: { ...state.packets, [safePacket.id]: safePacket },
@@ -419,6 +573,12 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     const port = device.ports.find((p) => p.id === portId);
     if (!port) return;
 
+    // Check if packet was already processed
+    if (packet.isProcessed) {
+      console.log(`[PROCESS] Packet ${packetId} already processed, skipping`);
+      return;
+    }
+
     // TTL
     if (packet.ttl <= 0) {
       get().removePacket(packetId);
@@ -438,7 +598,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
 
     // === HOST ===
     if (device.type === "host") {
-      // VLAN: host принимает только если vlanId совпадает с accessVlan его порта
+      // VLAN: host accepts only if vlanId matches accessVlan of its port
       if (port.isVlanEnabled && port.type === "access") {
         if (packet.vlanId !== port.accessVlan) {
           setTimeout(() => get().removePacket(packetId), 1000);
@@ -465,137 +625,164 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             arpPayload.type === "ARP-REQUEST" &&
             device.ip_address === arpPayload.targetIp
           ) {
-            setTimeout(() => {
+            get().updatePacket(packetId, { isProcessed: true });
+
+            const allDevices = get().devices;
+            const senderDevice = Object.values(allDevices).find(
+              (d) => d.mac_address === packet.sourceMAC
+            );
+            if (!senderDevice) {
               get().removePacket(packetId);
-              const allDevices = get().devices;
-              const senderDevice = Object.values(allDevices).find(
-                (d) => d.mac_address === packet.sourceMAC
-              );
-              if (!senderDevice) return;
-              const replyPath = buildArpReplyPath(
-                device,
-                senderDevice,
-                get().devices,
-                get().connections
-              );
-              const replyPacket: NetworkPacket = {
-                id: `arp-reply-${Date.now()}-${device.id}`,
-                sourceDeviceId: device.id,
-                sourcePortId: device.ports[0].id,
-                destMAC: packet.sourceMAC,
-                sourceMAC: device.mac_address,
-                vlanId: packet.vlanId,
-                payload: JSON.stringify({
-                  type: "ARP-REPLY",
-                  targetIp: arpPayload.targetIp,
-                  senderIp: device.ip_address,
-                  senderMac: device.mac_address,
-                }),
-                path: replyPath,
-                currentHop: 0,
-                x: device.x ?? 0,
-                y: device.y ?? 0,
-                isFlooded: false,
-                isResponse: true,
-                ttl: 64,
-                type: "ARP",
-                visited: new Set<string>(), // обязательно новый Set!
-              };
-              get().addPacket(replyPacket);
-              setTimeout(() => {
-                get().sendPacket(replyPacket.id);
-              }, 500);
-            }, 3000);
+              return;
+            }
+            const replyPath = buildArpReplyPath(
+              device,
+              senderDevice,
+              get().devices,
+              get().connections
+            );
+            const replyPacket: NetworkPacket = {
+              id: `arp-reply-${Date.now()}-${device.id}`,
+              sourceDeviceId: device.id,
+              sourcePortId: device.ports[0].id,
+              destMAC: packet.sourceMAC,
+              sourceMAC: device.mac_address,
+              vlanId: packet.vlanId,
+              payload: JSON.stringify({
+                type: "ARP-REPLY",
+                targetIp: arpPayload.targetIp,
+                senderIp: device.ip_address,
+                senderMac: device.mac_address,
+              }),
+              path: replyPath,
+              currentHop: 0,
+              x: device.x ?? 0,
+              y: device.y ?? 0,
+              isFlooded: false,
+              isResponse: true,
+              ttl: 64,
+              type: "ARP",
+              visited: new Set<string>(),
+              isProcessed: false,
+              isPlaying: false,
+            };
+            get().addPacket(replyPacket);
+            get().removePacket(packetId);
+            // Dynamic delay based on the number of hops in the flooding path
+            const totalHops = Math.max(
+              1,
+              Object.values(get().devices).length - 1 // Estimate based on device count
+            );
+            const arpDelay = totalHops * 1500 + 1000; // 1500 ms per hop + 1000 ms buffer
+            console.log(
+              `[DEBUG] ARP reply delay set to ${arpDelay} ms for ${totalHops} hops`
+            );
+            setTimeout(async () => {
+              get().updatePacket(replyPacket.id, { isPlaying: true });
+              await get().sendPacket(replyPacket.id);
+            }, arpDelay);
             return;
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error(`[ERROR] Parsing ARP payload: ${e}`);
+        }
       }
 
       // --- PING ---
       if (packet.type === "PING" && packet.payload) {
         try {
           const pingPayload = JSON.parse(packet.payload);
-          // Получатель ping-запроса
+          // Recipient of ping request
           if (
             pingPayload.type === "PING-REQUEST" &&
             device.mac_address === packet.destMAC
           ) {
-            setTimeout(() => {
+            get().updatePacket(packetId, { isProcessed: true });
+
+            const allDevices = get().devices;
+            const senderDevice = Object.values(allDevices).find(
+              (d) => d.mac_address === packet.sourceMAC
+            );
+            if (!senderDevice) {
               get().removePacket(packetId);
-              const allDevices = get().devices;
-              const senderDevice = Object.values(allDevices).find(
-                (d) => d.mac_address === packet.sourceMAC
-              );
-              if (!senderDevice) return;
-              const replyPath = buildArpReplyPath(
-                device,
-                senderDevice,
-                get().devices,
-                get().connections
-              );
-              const replyPacket: NetworkPacket = {
-                id: `ping-reply-${Date.now()}-${device.id}`,
-                sourceDeviceId: device.id,
-                sourcePortId: device.ports[0].id,
-                destMAC: packet.sourceMAC,
-                sourceMAC: device.mac_address,
-                vlanId: packet.vlanId,
-                payload: JSON.stringify({ type: "PING-REPLY" }),
-                path: replyPath,
-                currentHop: 0,
-                x: device.x ?? 0,
-                y: device.y ?? 0,
-                isFlooded: false,
-                isResponse: true,
-                ttl: 64,
-                type: "PING",
-                visited: new Set<string>(), // обязательно новый Set!
-                sentAt: packet.sentAt, // копируем sentAt из запроса
-              };
-              get().addPacket(replyPacket);
-              setTimeout(() => {
-                get().sendPacket(replyPacket.id);
-              }, 500);
-            }, 1000);
+              return;
+            }
+            const replyPath = buildArpReplyPath(
+              device,
+              senderDevice,
+              get().devices,
+              get().connections
+            );
+            const replyPacket: NetworkPacket = {
+              id: `ping-reply-${Date.now()}-${device.id}`,
+              sourceDeviceId: device.id,
+              sourcePortId: device.ports[0].id,
+              destMAC: packet.sourceMAC,
+              sourceMAC: device.mac_address,
+              vlanId: packet.vlanId,
+              payload: JSON.stringify({ type: "PING-REPLY" }),
+              path: replyPath,
+              currentHop: 0,
+              x: device.x ?? 0,
+              y: device.y ?? 0,
+              isFlooded: false,
+              isResponse: true,
+              ttl: 64,
+              type: "PING",
+              visited: new Set<string>(),
+              sentAt: packet.sentAt,
+              isProcessed: false,
+              isPlaying: false,
+            };
+            get().addPacket(replyPacket);
+            get().removePacket(packetId);
+            setTimeout(() => {
+              get().sendPacket(replyPacket.id);
+            }, 500);
             return;
           }
-          // Получатель ping-ответа (reply)
+          // Recipient of ping reply
           if (
             pingPayload.type === "PING-REPLY" &&
             device.mac_address === packet.destMAC
           ) {
             const rtt = packet.sentAt ? Date.now() - packet.sentAt : undefined;
             console.log(
-              `[PING] Host ${device.name} (${device.mac_address}) получил reply, RTT = ${rtt} мс, packet:`,
+              `[PING] Host ${device.name} (${device.mac_address}) received reply, RTT = ${rtt} ms, packet:`,
               packet
             );
             setTimeout(() => get().removePacket(packetId), 2000);
             return;
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error(`[ERROR] Parsing PING payload: ${e}`);
+        }
       }
 
-      // Flood-пакет исчезает на любом хосте, кроме отправителя (currentHop > 0)
+      // Flood packet disappears on any host except sender (currentHop > 0)
       if (packet.isFlooded && packet.currentHop > 0) {
         setTimeout(() => get().removePacket(packetId), 4000);
         return;
       }
 
-      // Обычный пакет: если MAC совпадает — доставляем
+      // Normal packet: deliver if MAC matches
       if (packet.destMAC === device.mac_address) {
         get().updatePacket(packetId, {
           currentHop: packet.currentHop + 1,
         });
-        setTimeout(() => get().removePacket(packetId), 4000);
+        console.log(
+          `[DELIVERY] Packet ${packet.id} successfully delivered to ${device.id}`
+        );
+        setTimeout(() => get().removePacket(packetId), 5000); // 5s display
         return;
       }
 
-      // Если есть следующий hop — передаём дальше!
+      // If there’s a next hop, forward it
+      // If there’s a next hop in path, check VLAN and forward
       if (packet.currentHop < packet.path.length - 1) {
         const nextHop = packet.path[packet.currentHop + 1];
         const nextDevice = state.devices[nextHop.deviceId];
         const nextPort = nextDevice?.ports.find((p) => p.id === nextHop.portId);
-        // VLAN check на выходном порту (host → switch)
         if (nextPort?.isVlanEnabled) {
           if (
             nextPort.type === "access" &&
@@ -612,11 +799,13 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             return;
           }
         }
+        // Update state atomically
         get().updatePacket(packetId, {
           currentHop: packet.currentHop + 1,
           x: nextDevice?.x ?? packet.x,
           y: nextDevice?.y ?? packet.y,
         });
+        // Wait for the animation duration (1500 ms) before processing the next hop
         await delay(1500);
         await get().processPacket(packetId, nextHop.deviceId, nextHop.portId);
         return;
@@ -627,7 +816,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
 
     // === SWITCH ===
     if (device.type === "switch") {
-      // VLAN tagging: если пакет пришёл на access-порт с включённым VLAN и без vlanId — присваиваем VLAN
+      console.log(
+        `[DEBUG] SWITCH ${deviceId} processing packet ${packet.id} at hop ${packet.currentHop}, port ${port.id}`
+      );
       let effectiveVlanId = packet.vlanId;
       if (
         port.type === "access" &&
@@ -637,30 +828,33 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         effectiveVlanId = port.accessVlan;
         get().updatePacket(packetId, { vlanId: effectiveVlanId });
         console.log(
-          `[SWITCH] ${deviceId} тегирует пакет ${packet.id} VLAN=${effectiveVlanId} на входе с access-порта ${portId}`
+          `[SWITCH] ${deviceId} tagging packet ${packet.id} with VLAN=${effectiveVlanId} on access port ${portId}`
         );
       }
 
-      // Forwarding loop prevention
       let visited =
         packet.visited instanceof Set
           ? packet.visited
           : new Set(packet.visited || []);
       const hopKey = `${device.id}:${port.id}`;
-      if (visited.has(hopKey)) {
+      const directionalHopKey = `${hopKey}:${
+        packet.isResponse ? "response" : "request"
+      }:${packet.currentHop % 2 === 0 ? "in" : "out"}`;
+
+      if (visited.has(directionalHopKey)) {
         console.log(
-          `[SWITCH] ${deviceId} дропает пакет ${packet.id}: forwarding loop (уже был на этом порту), visited:`,
+          `[SWITCH] ${deviceId} drops packet ${packet.id}: forwarding loop detected, visited:`,
           Array.from(visited),
-          "hopKey:",
-          hopKey
+          "directionalHopKey:",
+          directionalHopKey
         );
         get().removePacket(packetId);
         return;
       }
-      visited.add(hopKey);
+      visited.add(directionalHopKey);
       get().updatePacket(packetId, { visited });
 
-      // Если есть следующий hop в path — проверяем VLAN и передаём дальше
+      // If there’s a next hop in path, check VLAN and forward
       if (packet.currentHop < packet.path.length - 1) {
         const nextHop = packet.path[packet.currentHop + 1];
         const nextDevice = state.devices[nextHop.deviceId];
@@ -668,31 +862,34 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         if (nextPort?.isVlanEnabled) {
           if (
             nextPort.type === "access" &&
-            effectiveVlanId !== nextPort.accessVlan
+            packet.vlanId !== nextPort.accessVlan
           ) {
             setTimeout(() => get().removePacket(packetId), 1000);
             return;
           }
           if (
             nextPort.type === "trunk" &&
-            !nextPort.allowedVlanList?.includes(effectiveVlanId!)
+            !nextPort.allowedVlanList?.includes(packet.vlanId!)
           ) {
             setTimeout(() => get().removePacket(packetId), 1000);
             return;
           }
         }
+        // Update state atomically
         get().updatePacket(packetId, {
           currentHop: packet.currentHop + 1,
           x: nextDevice?.x ?? packet.x,
           y: nextDevice?.y ?? packet.y,
-          vlanId: effectiveVlanId,
         });
-        await delay(1500);
+        // Dynamic delay based on remaining hops (minimum 1500 ms per hop)
+        const remainingHops = packet.path.length - (packet.currentHop + 1);
+        const delayTime = Math.max(1500, remainingHops * 1500); // Ensure at least 1500 ms
+        await delay(delayTime);
         await get().processPacket(packetId, nextHop.deviceId, nextHop.portId);
         return;
       }
 
-      // Если нет следующего хопа в path, но есть destMAC — пробуем найти в MAC-таблице
+      // If no next hop but destMAC exists, look in MAC table
       const vlanId = effectiveVlanId ?? 0;
       const macTable = state.macTables[deviceId]?.[vlanId] ?? {};
       const destPortId = macTable[packet.destMAC]?.portId;
@@ -744,7 +941,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         }
       }
 
-      // FLOODING: если не нашли MAC в таблице или это broadcast
+      // FLOODING: if no MAC in table or it’s a broadcast
       if (
         !destPortId ||
         packet.isFlooded ||
@@ -754,6 +951,8 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         const portsToFlood = device.ports.filter(
           (p) => p.id !== port.id && p.connectedTo
         );
+        // Wait for the animation of the incoming packet to complete
+        await delay(1500); // Matches the animation duration in PacketEntity
         await Promise.all(
           portsToFlood.map(async (floodPort) => {
             if (floodPort.isVlanEnabled) {
@@ -776,7 +975,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             const visitKey = `${nextDeviceId}:${nextPortId}`;
             if (visited.has(visitKey)) return;
             console.log(
-              `[SWITCH] ${deviceId} FLOOD пакет ${packet.id} по порту ${floodPort.id} → ${nextDeviceId}:${nextPortId}`
+              `[SWITCH] ${deviceId} FLOOD packet ${packet.id} on port ${floodPort.id} → ${nextDeviceId}:${nextPortId}`
             );
             if (nextDevice) {
               const floodPacket: NetworkPacket = {
@@ -805,17 +1004,23 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
                 isFlooded: true,
                 isResponse: false,
                 ttl: packet.ttl,
-                visited: new Set(visited), // обязательно новый Set!
+                visited: new Set(visited),
                 type: packet.type,
-                sentAt: packet.sentAt, // для ping-flood
+                sentAt: packet.sentAt,
+                isProcessed: false,
+                isPlaying: false,
               };
               get().addPacket(floodPacket);
-              await delay(1500);
+              // Initial delay for animation start
+              await delay(500);
               get().updatePacket(floodPacket.id, {
+                isPlaying: true,
                 currentHop: 1,
                 x: nextDevice.x ?? floodPacket.x,
                 y: nextDevice.y ?? floodPacket.y,
               });
+              // Process the next hop after the animation duration
+              await delay(1500);
               await get().processPacket(
                 floodPacket.id,
                 nextDeviceId,
@@ -833,7 +1038,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       return;
     }
 
-    // Если тип устройства не определён — удаляем пакет
+    // If device type is undefined, remove packet
     get().removePacket(packetId);
   },
 
@@ -841,7 +1046,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     const state = get();
     if (!state.isSimulationRunning) return;
 
-    // Найти все пакеты, которые ещё не дошли до конца path
+    // Find all packets that haven’t reached the end of their path
     const packets = Object.values(state.packets).filter(
       (p) => p.currentHop < p.path.length
     );
@@ -851,7 +1056,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       return;
     }
 
-    // Для каждого пакета запустить processPacket параллельно
+    // Process each packet in parallel
     await Promise.all(
       packets.map(async (packet) => {
         const currentHop = packet.path[packet.currentHop];
@@ -865,7 +1070,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       })
     );
 
-    // Следующий тик через 1500 мс
+    // Next tick after 1500 ms
     setTimeout(() => {
       get().tickSimulation();
     }, 1500);
@@ -936,3 +1141,54 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       }
     }),
 }));
+
+// Helper function for VLAN compatibility
+function getPortVlan(port: Port): number | undefined {
+  if (port.isVlanEnabled) {
+    if (port.type === "access" && port.accessVlan !== undefined) {
+      return port.accessVlan;
+    }
+    if (port.type === "trunk" && port.allowedVlanList) {
+      return port.allowedVlanList[0]; // Take first VLAN as an example, can be improved
+    }
+  }
+  return undefined;
+}
+
+function checkVlanCompatibility(
+  from: Port,
+  to: Port,
+  fromDevice: Device,
+  toDevice: Device
+): boolean {
+  // If neither port uses VLAN, compatibility is guaranteed
+  if (!from.isVlanEnabled && !to.isVlanEnabled) return true;
+
+  const fromVlan = getPortVlan(from);
+  const toVlan = getPortVlan(to);
+
+  // If both ports are access, VLANs must match
+  if (from.type === "access" && to.type === "access") {
+    return fromVlan === toVlan;
+  }
+
+  // If from is access, to is trunk, trunk must allow from's VLAN
+  if (from.type === "access" && to.type === "trunk" && fromVlan !== undefined) {
+    return to.allowedVlanList?.includes(fromVlan) || false;
+  }
+
+  // If to is access, from is trunk, trunk must allow to's VLAN
+  if (from.type === "trunk" && to.type === "access" && toVlan !== undefined) {
+    return from.allowedVlanList?.includes(toVlan) || false;
+  }
+
+  // If both ports are trunk, VLAN lists must intersect
+  if (from.type === "trunk" && to.type === "trunk") {
+    if (!from.allowedVlanList || !to.allowedVlanList) return false;
+    return from.allowedVlanList.some((vlan) =>
+      to.allowedVlanList.includes(vlan)
+    );
+  }
+
+  return true; // Default compatibility if conditions are undefined
+}

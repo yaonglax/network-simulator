@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useTheme, Theme } from '@mui/material/styles';
 import {
     Box,
-    Button,
     Divider,
     Drawer,
     List,
@@ -13,13 +12,17 @@ import {
 } from "@mui/material";
 import {
     ChevronLeft as ChevronLeftIcon,
-    ChevronRight as ChevronRightIcon,
-    ArrowForward as ArrowForwardIcon
+    ChevronRight as ChevronRightIcon
 } from "@mui/icons-material";
 
 interface OverlayProps {
     open: boolean;
     theme?: Theme;
+}
+
+interface DrawerProps {
+    elementsArray?: string[];
+    children?: React.ReactNode;
 }
 
 const DrawerHeader = styled('div')(({ theme }) => ({
@@ -42,7 +45,7 @@ const Overlay = styled('div')<OverlayProps>(({ open }) => ({
     transition: 'opacity 0.3s, visibility 0.3s',
 }));
 
-export default function PersistentDrawerLeft() {
+export default function PersistentDrawerLeft({ elementsArray, children }: DrawerProps) {
     const [open, setOpen] = useState(false);
     const theme = useTheme();
 
@@ -65,7 +68,6 @@ export default function PersistentDrawerLeft() {
         <>
             <Overlay open={open} onClick={handleDrawerToggle} />
 
-            {/* Заменили Button на Box с IconButton внутри для лучшего контроля */}
             <Box
                 sx={{
                     position: 'fixed',
@@ -119,15 +121,31 @@ export default function PersistentDrawerLeft() {
             >
                 <DrawerHeader />
                 <Divider />
-                <List>
-                    {['Теория сетей', 'Типы устройств', 'Примеры конфигураций'].map((text) => (
-                        <ListItem key={text} disablePadding>
-                            <ListItemButton>
-                                <ListItemText primary={text} />
-                            </ListItemButton>
-                        </ListItem>
-                    ))}
-                </List>
+                {elementsArray !== undefined ?
+                    <List>
+                        {elementsArray.map((text, index) => (
+                            <ListItem key={index} disablePadding>
+                                <ListItemButton>
+                                    <ListItemText primary={text} />
+                                </ListItemButton>
+                            </ListItem>
+                        ))}
+                    </List>
+                    :
+                    ''}
+                <Box
+                    component="main"
+                    sx={{
+                        flexGrow: 1,
+                        p: 3,
+                        transition: theme.transitions.create('margin', {
+                            easing: theme.transitions.easing.sharp,
+                            duration: theme.transitions.duration.leavingScreen,
+                        }),
+                    }}
+                >
+                    {children}
+                </Box>
             </Drawer>
         </>
     );
