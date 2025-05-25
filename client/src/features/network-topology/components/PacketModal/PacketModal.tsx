@@ -17,7 +17,8 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
     const [selectedPortId, setSelectedPortId] = useState<string>('');
     const [packetType, setPacketType] = useState<PacketType>('normal');
     const [arpTargetIp, setArpTargetIp] = useState('');
-    const { addPacket, devices } = useNetworkStore();
+    const [pingTargetIp, setPingTargetIp] = useState('');
+    const { addPacket, devices, sendPing } = useNetworkStore();
 
     const formStyles = {
         '& .MuiInputBase-input': {
@@ -85,119 +86,112 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
         }
     };
 
-    const handleSendPacket = () => {
-        if (!selectedPortId || (packetType === 'normal' && macError)) {
-            console.warn('Cannot send packet: invalid port or MAC error', {
-                selectedPortId,
-                macError,
+    const validateIp = (ip: string): boolean => {
+        const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+        return ipRegex.test(ip);
+    };
+
+    const handleSendPacket = async () => {
+        try {
+            if (!selectedPortId) {
+                console.warn('Cannot send packet: no port selected', { selectedPortId });
+                return;
+            }
+
+            const sourcePort = device.ports?.find((p) => p.id === selectedPortId);
+            if (!sourcePort) {
+                console.error('Source port not found:', selectedPortId);
+                return;
+            }
+
+            const sourceMAC =
+                device.type === 'host' ? device.mac_address : sourcePort.mac_address ?? '';
+
+            let vlanId: number | undefined = undefined;
+            if (sourcePort.isVlanEnabled && sourcePort.type === 'access') {
+                vlanId = sourcePort.accessVlan;
+            }
+
+            if (packetType === 'PING') {
+                if (!pingTargetIp || !validateIp(pingTargetIp)) {
+                    alert('Укажите корректный IP-адрес для ping');
+                    return;
+                }
+                console.log(`Sending PING from ${device.id} to IP ${pingTargetIp}`);
+                await sendPing(device.id, pingTargetIp);
+                return; // Не вызываем handlePopoverClose здесь, так как это сделает finally
+            }
+
+            let packet: NetworkPacket;
+
+            if (packetType === 'ARP') {
+                if (!arpTargetIp) {
+                    alert('Укажите IP-адрес, который ищете (target IP)');
+                    return;
+                }
+                packet = {
+                    id: crypto.randomUUID(),
+                    path: [],
+                    currentHop: 0,
+                    sourceDeviceId: device.id,
+                    sourcePortId: selectedPortId,
+                    sourceMAC,
+                    destMAC: 'FF:FF:FF:FF:FF:FF',
+                    payload: JSON.stringify({
+                        type: 'ARP-REQUEST',
+                        targetIp: arpTargetIp,
+                        senderIp: device.ip_address,
+                    }),
+                    ttl: 64,
+                    x: device.x ?? 0,
+                    y: device.y ?? 0,
+                    isResponse: false,
+                    isFlooded: true,
+                    type: 'ARP',
+                    vlanId,
+                };
+            } else {
+                if (macError) {
+                    console.warn('Cannot send packet: MAC error', { macError });
+                    return;
+                }
+                packet = {
+                    id: crypto.randomUUID(),
+                    path: [],
+                    currentHop: 0,
+                    sourceDeviceId: device.id,
+                    sourcePortId: selectedPortId,
+                    sourceMAC,
+                    destMAC,
+                    payload,
+                    ttl: 64,
+                    x: device.x ?? 0,
+                    y: device.y ?? 0,
+                    isResponse: false,
+                    isFlooded: destMAC === 'FF:FF:FF:FF:FF:FF',
+                    type: 'DATA',
+                    vlanId,
+                };
+            }
+
+            console.log('Sending packet:', {
+                id: packet.id,
+                sourceDeviceId: packet.sourceDeviceId,
+                sourcePortId: packet.sourcePortId,
+                sourceMAC: packet.sourceMAC,
+                destMAC: packet.destMAC,
+                isFlooded: packet.isFlooded,
+                type: packet.type,
+                payload: packet.payload,
+                vlanId: packet.vlanId,
             });
-            return;
+
+            addPacket(packet);
+        } catch (error) {
+            console.error('Error sending packet:', error);
+        } finally {
+            handlePopoverClose(); // Гарантируем закрытие окна
         }
-
-        const sourcePort = device.ports?.find((p) => p.id === selectedPortId);
-        if (!sourcePort) {
-            console.error('Source port not found:', selectedPortId);
-            return;
-        }
-
-        const sourceMAC =
-            device.type === 'host' ? device.mac_address : sourcePort.mac_address ?? '';
-
-        let vlanId: number | undefined = undefined;
-        if (sourcePort.isVlanEnabled && sourcePort.type === 'access') {
-            vlanId = sourcePort.accessVlan;
-        }
-
-        let packet: NetworkPacket;
-
-        if (packetType === 'ARP') {
-            if (!arpTargetIp) {
-                alert('Укажите IP-адрес, который ищете (target IP)');
-                return;
-            }
-            packet = {
-
-
-                id: crypto.randomUUID(),
-                path: [],
-                currentHop: 0,
-                sourceDeviceId: device.id,
-                sourcePortId: selectedPortId,
-                sourceMAC,
-                destMAC: 'FF:FF:FF:FF:FF:FF',
-                payload: JSON.stringify({
-                    type: 'ARP-REQUEST',
-                    targetIp: arpTargetIp,
-                    senderIp: device.ip_address,
-                }),
-                ttl: 64,
-                x: device.x ?? 0,
-                y: device.y ?? 0,
-                isResponse: false,
-                isFlooded: true,
-                type: 'ARP',
-                vlanId,
-            };
-        }
-        else if (packetType === 'PING') {
-            const now = Date.now();
-            if (!destMAC || macError) {
-                alert('Укажите корректный MAC-адрес назначения для ping');
-                return;
-            }
-            packet = {
-                id: crypto.randomUUID(),
-                path: [],
-                currentHop: 0,
-                sourceDeviceId: device.id,
-                sourcePortId: selectedPortId,
-                sourceMAC,
-                destMAC,
-                payload: JSON.stringify({ type: "PING-REQUEST" }),
-                ttl: 64,
-                x: device.x ?? 0,
-                y: device.y ?? 0,
-                isResponse: false,
-                isFlooded: false,
-                type: "PING",
-                vlanId,
-                sentAt: now,
-            };
-        }
-        else {
-            packet = {
-                id: crypto.randomUUID(),
-                path: [],
-                currentHop: 0,
-                sourceDeviceId: device.id,
-                sourcePortId: selectedPortId,
-                sourceMAC,
-                destMAC,
-                payload,
-                ttl: 64,
-                x: device.x ?? 0,
-                y: device.y ?? 0,
-                isResponse: false,
-                isFlooded: destMAC === 'FF:FF:FF:FF:FF:FF',
-                type: 'DATA',
-                vlanId,
-            };
-        }
-
-        console.log('Sending packet:', {
-            id: packet.id,
-            sourceDeviceId: packet.sourceDeviceId,
-            sourcePortId: packet.sourcePortId,
-            sourceMAC: packet.sourceMAC,
-            destMAC: packet.destMAC,
-            isFlooded: packet.isFlooded,
-            type: packet.type,
-            payload: packet.payload,
-            vlanId: packet.vlanId,
-        });
-
-        addPacket(packet);
-        handlePopoverClose();
     };
 
     return (
@@ -210,7 +204,6 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
             color: 'white',
             ...formStyles,
             pr: 4,
-
         }}>
             <Typography variant='h6' sx={{ color: 'white' }}>Отправка пакета</Typography>
 
@@ -309,13 +302,13 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
 
             {packetType === 'PING' && (
                 <TextField
-                    label='MAC назначения'
-                    value={destMAC}
-                    onChange={(e) => handleMacChange(e.target.value)}
-                    error={!!macError}
-                    helperText={macError}
+                    label='IP-адрес назначения'
+                    value={pingTargetIp}
+                    onChange={(e) => setPingTargetIp(e.target.value)}
+                    error={pingTargetIp && !validateIp(pingTargetIp)}
+                    helperText={pingTargetIp && !validateIp(pingTargetIp) ? 'Неверный формат IP-адреса' : ''}
                     size='small'
-                    placeholder='MAC-адрес получателя'
+                    placeholder='Например, 192.168.1.100'
                     fullWidth
                     sx={formStyles}
                 />
@@ -344,7 +337,8 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
                 disabled={
                     !selectedPortId ||
                     (packetType === 'normal' && !!macError) ||
-                    (packetType === 'ARP' && !arpTargetIp)
+                    (packetType === 'ARP' && !arpTargetIp) ||
+                    (packetType === 'PING' && (!pingTargetIp || !validateIp(pingTargetIp)))
                 }
                 sx={{
                     mt: 2,

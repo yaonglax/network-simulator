@@ -48,6 +48,7 @@ export interface NetworkState {
   setActiveConnection: (connectionId: string) => void;
   clearActiveConnection: (connectionId: string) => void;
   ageMacTables: () => void;
+  sendPing: (fromDeviceId: string, targetIp: string) => Promise<void>;
 }
 
 function findDeviceByIp(
@@ -260,19 +261,9 @@ function buildArpReplyPath(
     }
   }
 
-  // Remove duplicates while preserving order
-  const uniquePath: Array<{ deviceId: string; portId: string; process: any }> =
-    [];
-  const seenDevices = new Set<string>();
-  for (const step of path) {
-    if (!seenDevices.has(step.deviceId)) {
-      seenDevices.add(step.deviceId);
-      uniquePath.push(step);
-    }
-  }
-
-  console.log(`[DEBUG] buildArpReplyPath: Final path:`, uniquePath);
-  return uniquePath.map((step) => ({
+  // Ensure path includes all steps
+  console.log(`[DEBUG] buildArpReplyPath: Final path:`, path);
+  return path.map((step) => ({
     deviceId: step.deviceId,
     portId: step.portId,
     process: (p: NetworkPacket, devId: string) => {},
@@ -513,7 +504,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         visited: packet.visited ?? new Set<string>(),
         vlanId: effectiveVlanId,
         isProcessed: false,
-        isPlaying: false, // Added to satisfy type
+        isPlaying: false,
       };
       return {
         packets: { ...state.packets, [safePacket.id]: safePacket },
@@ -730,15 +721,22 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
               ttl: 64,
               type: "PING",
               visited: new Set<string>(),
-              sentAt: packet.sentAt,
+              sentAt: Date.now(), // Update sentAt for accurate RTT
               isProcessed: false,
               isPlaying: false,
             };
             get().addPacket(replyPacket);
             get().removePacket(packetId);
-            setTimeout(() => {
-              get().sendPacket(replyPacket.id);
-            }, 500);
+            // Dynamic delay based on the number of hops in the path
+            const totalHops = replyPath.length - 1; // Number of hops in reply path
+            const pingDelay = totalHops * 1500 + 1000; // 1500 ms per hop + 1000 ms buffer
+            console.log(
+              `[DEBUG] PING reply delay set to ${pingDelay} ms for ${totalHops} hops`
+            );
+            setTimeout(async () => {
+              get().updatePacket(replyPacket.id, { isPlaying: true });
+              await get().sendPacket(replyPacket.id);
+            }, pingDelay);
             return;
           }
           // Recipient of ping reply
@@ -751,7 +749,10 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
               `[PING] Host ${device.name} (${device.mac_address}) received reply, RTT = ${rtt} ms, packet:`,
               packet
             );
-            setTimeout(() => get().removePacket(packetId), 2000);
+            // Dynamic removal delay based on path length
+            const totalHops = packet.path.length - 1;
+            const removalDelay = totalHops * 1500 + 2000; // Display for longer in larger topologies
+            setTimeout(() => get().removePacket(packetId), removalDelay);
             return;
           }
         } catch (e) {
@@ -778,7 +779,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       }
 
       // If there’s a next hop, forward it
-      // If there’s a next hop in path, check VLAN and forward
       if (packet.currentHop < packet.path.length - 1) {
         const nextHop = packet.path[packet.currentHop + 1];
         const nextDevice = state.devices[nextHop.deviceId];
@@ -1011,15 +1011,12 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
                 isPlaying: false,
               };
               get().addPacket(floodPacket);
-              // Initial delay for animation start
               await delay(500);
               get().updatePacket(floodPacket.id, {
-                isPlaying: true,
                 currentHop: 1,
                 x: nextDevice.x ?? floodPacket.x,
                 y: nextDevice.y ?? floodPacket.y,
               });
-              // Process the next hop after the animation duration
               await delay(1500);
               await get().processPacket(
                 floodPacket.id,
@@ -1042,6 +1039,100 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     get().removePacket(packetId);
   },
 
+  sendPing: async (fromDeviceId: string, targetIp: string) => {
+    const state = get();
+    const fromDevice = state.devices[fromDeviceId];
+    if (!fromDevice) {
+      console.warn(`[PING] Source device ${fromDeviceId} not found`);
+      return;
+    }
+
+    const targetDevice = findDeviceByIp(targetIp, state.devices);
+    if (!targetDevice) {
+      console.warn(`[PING] Target device with IP ${targetIp} not found`);
+      return;
+    }
+
+    // Check if we know the MAC address of the target
+    let destMAC = targetDevice.mac_address;
+    const vlanId = fromDevice.ports[0]?.isVlanEnabled
+      ? fromDevice.ports[0].accessVlan
+      : undefined;
+
+    // If MAC is not known, initiate ARP request
+    if (!destMAC) {
+      console.log(
+        `[PING] MAC address of ${targetIp} unknown, sending ARP request from ${fromDeviceId}`
+      );
+      const arpPacket: NetworkPacket = {
+        id: `arp-ping-${Date.now()}-${fromDeviceId}`,
+        sourceDeviceId: fromDeviceId,
+        sourcePortId: fromDevice.ports[0].id,
+        destMAC: "FF:FF:FF:FF:FF:FF",
+        sourceMAC: fromDevice.mac_address,
+        vlanId: vlanId,
+        payload: JSON.stringify({
+          type: "ARP-REQUEST",
+          targetIp: targetIp,
+          senderIp: fromDevice.ip_address,
+        }),
+        path: [],
+        currentHop: 0,
+        x: fromDevice.x ?? 0,
+        y: fromDevice.y ?? 0,
+        isFlooded: true,
+        isResponse: false,
+        ttl: 64,
+        type: "ARP",
+        visited: new Set<string>(),
+        isProcessed: false,
+        isPlaying: false,
+      };
+      get().addPacket(arpPacket);
+      await delay(500);
+      await get().sendPacket(arpPacket.id);
+
+      // Wait for ARP reply (simplified for now, ideally use a callback or event)
+      await delay(5000); // Wait for ARP to resolve (adjust based on topology)
+      const updatedTargetDevice = findDeviceByIp(targetIp, get().devices);
+      destMAC = updatedTargetDevice?.mac_address;
+      if (!destMAC) {
+        console.warn(`[PING] Failed to resolve MAC address for ${targetIp}`);
+        return;
+      }
+    }
+
+    // Send PING-REQUEST
+    const pingPacket: NetworkPacket = {
+      id: `ping-${Date.now()}-${fromDeviceId}`,
+      sourceDeviceId: fromDeviceId,
+      sourcePortId: fromDevice.ports[0].id,
+      destMAC: destMAC,
+      sourceMAC: fromDevice.mac_address,
+      vlanId: vlanId,
+      payload: JSON.stringify({ type: "PING-REQUEST" }),
+      path: buildArpReplyPath(
+        fromDevice,
+        targetDevice,
+        state.devices,
+        state.connections
+      ),
+      currentHop: 0,
+      x: fromDevice.x ?? 0,
+      y: fromDevice.y ?? 0,
+      isFlooded: false,
+      isResponse: false,
+      ttl: 64,
+      type: "PING",
+      visited: new Set<string>(),
+      sentAt: Date.now(),
+      isProcessed: false,
+      isPlaying: false,
+    };
+    get().addPacket(pingPacket);
+    // Не запускаем анимацию сразу, ждём startSimulation
+  },
+
   tickSimulation: async () => {
     const state = get();
     if (!state.isSimulationRunning) return;
@@ -1061,6 +1152,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       packets.map(async (packet) => {
         const currentHop = packet.path[packet.currentHop];
         if (currentHop) {
+          get().updatePacket(packet.id, { isPlaying: true }); // Запускаем анимацию
           await get().processPacket(
             packet.id,
             currentHop.deviceId,
