@@ -1,9 +1,11 @@
+
 import React from 'react';
 import { Box, MenuItem, Modal, Select, Typography, Button } from '@mui/material';
 import { useNetworkStore } from '@/features/network-topology/store/network-store';
 import { Port } from '@/features/network-topology/types';
 
 interface PortConnectionProps {
+    deviceId: string;
     deviceIdStart: string;
     deviceIdEnd: string;
     open: boolean;
@@ -12,31 +14,32 @@ interface PortConnectionProps {
 }
 
 const PortConnectionModal: React.FC<PortConnectionProps> = ({
+    deviceId,
     deviceIdEnd,
     deviceIdStart,
     open,
     onClose,
     onConnect
 }) => {
-    const { devices, connectPorts } = useNetworkStore();
+    // Получаем устройства из стора по id — всегда актуальные!
+    const startDevice = useNetworkStore(state => state.devices[deviceIdStart]);
+    const endDevice = useNetworkStore(state => state.devices[deviceIdEnd]);
+    const connectPorts = useNetworkStore(state => state.connectPorts);
+
     const [selectedStartPort, setSelectedStartPort] = React.useState<string>('');
     const [selectedEndPort, setSelectedEndPort] = React.useState<string>('');
 
     // Получаем свободные порты (те, у которых нет connectedTo)
-    const getFreePorts = (deviceId: string): Port[] => {
-        const device = devices[deviceId];
+    const getFreePorts = (device?: typeof startDevice): Port[] => {
         if (!device?.ports) return [];
         return device.ports.filter(port => !port.connectedTo);
     };
 
-    const startDevicePorts = getFreePorts(deviceIdStart);
-    const endDevicePorts = getFreePorts(deviceIdEnd);
+    const startDevicePorts = getFreePorts(startDevice);
+    const endDevicePorts = getFreePorts(endDevice);
 
     const handleConnect = () => {
         if (!selectedStartPort || !selectedEndPort) return;
-
-        const startDevice = devices[deviceIdStart];
-        const endDevice = devices[deviceIdEnd];
 
         if (!startDevice || !endDevice) {
             console.error("Устройства не найдены");
@@ -51,26 +54,8 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
             return;
         }
 
-        console.log("Перед соединением:", {
-            startPort: { ...startPort },
-            endPort: { ...endPort }
-        });
-
         try {
-            // Соединяем порты
             connectPorts(startPort, endPort);
-
-            // Обновляем информацию о портах в консоли
-            const updatedStartPort = startDevice.ports?.find(p => p.id === selectedStartPort);
-            const updatedEndPort = endDevice.ports?.find(p => p.id === selectedEndPort);
-
-            console.log("После соединения:", {
-                startPort: { ...updatedStartPort },
-                endPort: { ...updatedEndPort }
-            });
-
-            console.log(devices)
-
             onConnect();
             onClose();
         } catch (error) {
@@ -97,7 +82,7 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
 
                 <Box>
                     <Typography>
-                        {devices[deviceIdStart]?.name || `Устройство ${deviceIdStart}`}
+                        {startDevice?.name || `Устройство ${deviceIdStart}`}
                     </Typography>
                     <Select
                         value={selectedStartPort}
@@ -109,7 +94,7 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
                         {startDevicePorts.length > 0 ? (
                             startDevicePorts.map((port) => (
                                 <MenuItem key={port.id} value={port.id}>
-                                    {port.name || port.id} ({devices[deviceIdStart].type === 'switch' ? port.id : port.ip_address})
+                                    {port.name || port.id} ({startDevice.type === 'switch' ? port.id : port.ip_address})
                                 </MenuItem>
                             ))
                         ) : (
@@ -120,7 +105,7 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
 
                 <Box>
                     <Typography>
-                        {devices[deviceIdEnd]?.name || `Устройство ${deviceIdEnd}`}
+                        {endDevice?.name || `Устройство ${deviceIdEnd}`}
                     </Typography>
                     <Select
                         value={selectedEndPort}
@@ -128,16 +113,25 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
                         fullWidth
                         displayEmpty
                     >
-                        <MenuItem value="" disabled>Выберите порт</MenuItem>
+                        <MenuItem value="" disabled>
+                            Выберите порт
+                        </MenuItem>
+
+
                         {endDevicePorts.length > 0 ? (
                             endDevicePorts.map((port) => (
                                 <MenuItem key={port.id} value={port.id}>
-                                    {port.name || port.id} ({devices[deviceIdEnd].type === 'switch' ? port.id : port.ip_address})
+                                    {port.name || port.id} (
+                                    {endDevice.type === "switch"
+                                        ? port.id
+                                        : endDevice.ip_address || "нет IP"}
+                                    )
                                 </MenuItem>
                             ))
                         ) : (
                             <MenuItem disabled>Нет свободных портов</MenuItem>
                         )}
+
                     </Select>
                 </Box>
 

@@ -1,11 +1,15 @@
-import { Device, Port } from "@/features/network-topology/types";
+
+import { useNetworkStore } from "../../store/network-store";
 import { Box, Typography } from "@mui/material";
 
 interface PortsListProps {
-    device: Device | null;
+    deviceId: string | null;
 }
 
-const PortsList: React.FC<PortsListProps> = ({ device }) => {
+const PortsList: React.FC<PortsListProps> = ({ deviceId }) => {
+    const device = useNetworkStore(state => deviceId ? state.devices[deviceId] : null);
+    const devices = useNetworkStore(state => state.devices);
+
     if (!device) {
         return (
             <Box sx={{ p: 2 }}>
@@ -24,7 +28,7 @@ const PortsList: React.FC<PortsListProps> = ({ device }) => {
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 1 }}>
-            {device.ports.map((port: Port, index: number) => (
+            {device.ports.map((port, index) => (
                 <Box
                     key={`${device.id}-port-${index}`}
                     component="section"
@@ -32,13 +36,18 @@ const PortsList: React.FC<PortsListProps> = ({ device }) => {
                         p: 2,
                         border: '1px dashed grey',
                         borderRadius: 1,
-                        backgroundColor: port.connectedTo ? '#f0f0f0' : 'transparent'
+                        color: 'var(--text-gray)',
+                        backgroundColor: port.connectedTo ? 'var(--detail-gray)' : 'transparent'
                     }}
                 >
                     <Typography variant="body2">
-                        {port.name || `Port ${index + 1}`} ({port.ip_address || 'no IP'}) —
+                        {port.name || `Port ${index + 1}`} (
+                        {device.type === 'host'
+                            ? device.ip_address || 'no IP'
+                            : port.ip_address || 'no IP'}
+                        ) —
                         {port.connectedTo
-                            ? ` Connected to device: ${port.connectedTo.deviceId}`
+                            ? `→ ${devices[port.connectedTo.deviceId]?.name ?? port.connectedTo.deviceId} (${port.connectedTo.portId})`
                             : ' Not connected'}
                     </Typography>
                 </Box>

@@ -63,7 +63,7 @@ export const ContextMenuPopover = ({ device, anchorEl, setAnchorEl }: PortsModal
             case "Настройки":
                 return <SettingsContent device={device} onSave={handleDeviceSave} />;
             case "Порты":
-                return <PortsList device={device} />;
+                return <PortsList deviceId={device.id} />;
             case "Удалить":
                 return (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -74,7 +74,8 @@ export const ContextMenuPopover = ({ device, anchorEl, setAnchorEl }: PortsModal
                         <Button onClick={() => {
                             handleDeleteCancel();
                             setChoice(null)
-                        }}>
+                        }}
+                            sx={{ color: 'var(--text-gray)' }}>
                             Отмена
                         </Button>
                     </Box>

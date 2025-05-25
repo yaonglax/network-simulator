@@ -1,6 +1,6 @@
-import ControlledAccordions from '@/features/teory/ControlledAccordions';
+import ControlledAccordions from '@/features/theory/ControlledAccordions';
 import { Box } from '@mui/material';
-import PersistentDrawerLeft from '@/features/teory/Drawer';
+import PersistentDrawerLeft from '@/features/theory/Drawer';
 
 const TheoryPage = () => {
     const drawerItems = [

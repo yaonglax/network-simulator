@@ -347,8 +347,11 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
         if (!deviceType) return;
 
         const newPortCount = Number(e.target.value);
-        if (deviceType === 'host' && newPortCount !== 1) {
-            alert('Хост может иметь только один порт');
+        // Ограничиваем количество портов согласно DEVICE_PORT_CONFIG
+        const minPorts = DEVICE_PORT_CONFIG[deviceType].minPorts;
+        const maxPorts = DEVICE_PORT_CONFIG[deviceType].maxPorts;
+        if (newPortCount < minPorts || newPortCount > maxPorts) {
+            alert(`Количество портов для ${deviceType} должно быть от ${minPorts} до ${maxPorts}`);
             return;
         }
         setPortCount(newPortCount);
@@ -417,7 +420,6 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                                 width: '260px',
                                 borderWidth: '2px',
                                 transition: 'all 0.2s ease',
-
                                 '&:hover': {
                                     backgroundColor: 'var(--hover-purple)',
                                     color: 'var(--text-gray)'
@@ -430,7 +432,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                     </Box>
 
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, ...formStyles }}>
-                        {deviceType && deviceType !== 'host' && (
+                        {deviceType && (
                             <TextField
                                 label="Количество портов"
                                 type="number"
@@ -441,6 +443,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                                 value={portCount}
                                 onChange={handlePortCountChange}
                                 sx={{ mt: 2 }}
+                                helperText={`Для ${deviceType === 'host' ? 'хоста' : deviceType} от ${DEVICE_PORT_CONFIG[deviceType].minPorts} до ${DEVICE_PORT_CONFIG[deviceType].maxPorts} портов`}
                             />
                         )}
 
@@ -557,7 +560,12 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                                 onChange={handleChange}
                                 required
                                 error={submitAttempted && !formData.ip_address}
-                                helperText={submitAttempted && !formData.ip_address ? 'IP-адрес обязателен' : ''}
+                                helperText={
+                                    (submitAttempted && !formData.ip_address
+                                        ? 'IP-адрес обязателен'
+                                        : 'Этот IP-адрес будет назначен всем портам хоста.'
+                                    )
+                                }
                                 sx={{ mt: 2, ...formStyles }}
                             />
                             <TextField

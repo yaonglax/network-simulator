@@ -1,6 +1,6 @@
 import { Box } from '@mui/material';
 import { NetworkCanvas } from '@/features/network-topology/components/NetworkCanvas/NetworkCanvas';
-import PersistentDrawerLeft from '@/features/teory/Drawer';
+import PersistentDrawerLeft from '@/features/theory/Drawer';
 
 const NetworkEditorPage = () => {
     return (

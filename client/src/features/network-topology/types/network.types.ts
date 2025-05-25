@@ -51,6 +51,7 @@ export interface NetworkPacket {
   sentAt?: number;
   isProcessed: boolean;
   isPlaying: boolean;
+  position?: { x: number; y: number };
 }
 
 export interface MacTableEntry {

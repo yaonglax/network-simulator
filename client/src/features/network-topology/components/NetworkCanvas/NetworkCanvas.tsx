@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { Paper, Button, Typography } from '@mui/material';
 import { useNetworkStore } from '../../store/network-store';
@@ -53,6 +54,7 @@ export const NetworkCanvas = () => {
     const addDevice = useNetworkStore((state) => state.addDevice);
     const startSimulation = useNetworkStore((state) => state.startSimulation);
     const clearPackets = useNetworkStore((state) => state.clearPackets);
+    const clearTopology = useNetworkStore((state) => state.clearTopology)
 
     const [isPlaying, setIsPlaying] = useState(isSimulationRunning);
 
@@ -84,10 +86,12 @@ export const NetworkCanvas = () => {
     }, [uniqueDevices]);
 
     useEffect(() => {
-        console.log('Devices coordinates:', Object.values(devices).map(device => ({
+        console.log('Devices:', Object.values(devices).map(device => ({
             id: device.id,
-            x: device.x,
-            y: device.y,
+            name: device.name,
+            type: device.type,
+            ports: device.ports,
+
         })));
     }, [devices]);
 
@@ -159,6 +163,16 @@ export const NetworkCanvas = () => {
         }
     };
 
+    // === ДОБАВЛЕНО: Проверка на существующее соединение между двумя устройствами ===
+    const isDevicesAlreadyConnected = (deviceAId: string, deviceBId: string): boolean => {
+        return connections.some(
+            (conn) =>
+                (conn.from.deviceId === deviceAId && conn.to.deviceId === deviceBId) ||
+                (conn.from.deviceId === deviceBId && conn.to.deviceId === deviceAId)
+        );
+    };
+    // === КОНЕЦ ДОБАВЛЕНИЯ ===
+
     const handleDoubleClick = (e: React.MouseEvent<HTMLElement>, device: Device) => {
         e.preventDefault();
         e.stopPropagation();
@@ -184,6 +198,16 @@ export const NetworkCanvas = () => {
                 setSelectedStartDevice(null);
                 return;
             }
+
+            // === ДОБАВЛЕНО: Проверка на существующее соединение ===
+            if (selectedStartDevice && isDevicesAlreadyConnected(selectedStartDevice.id, device.id)) {
+                setIsDrawingConn(false);
+                setSelectedStartDevice(null);
+                alert('Между этими устройствами уже есть соединение!');
+                window.electronAPI?.focus?.forceFocus();
+                return;
+            }
+            // === КОНЕЦ ДОБАВЛЕНИЯ ===
 
             const freePorts = getFreePorts(device.id);
             if (freePorts.length === 0) {
@@ -437,6 +461,27 @@ export const NetworkCanvas = () => {
                     }}
                 >
                     Очистить пакеты
+                </Button>
+                <Button
+                    variant="contained"
+                    onClick={() => {
+                        clearTopology();
+                        clearPackets()
+                    }}
+                    sx={{
+                        backgroundColor: 'var(--accent-purple)',
+                        color: 'var(--contrast-white)',
+                        minWidth: '20px',
+                        minHeight: '12px',
+                        width: '180px',
+                        height: '50px',
+                        borderRadius: '0.5rem',
+                        '&:hover': { bgcolor: 'var(--hover-purple)', border: '1px solid var(--highlight-purple)', boxShadow: '0px 0px 1px var(--highlight-purple)' },
+                        zIndex: 1000,
+                        marginLeft: '8px'
+                    }}
+                >
+                    Очистить топологию
                 </Button>
             </Box>
         </>

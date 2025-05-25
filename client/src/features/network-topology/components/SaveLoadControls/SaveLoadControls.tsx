@@ -12,7 +12,8 @@ export function SaveLoadControls() {
             const state = useNetworkStore.getState();
             const topology: NetworkTopology = {
                 devices: state.devices,
-                connections: state.connections
+                connections: state.connections,
+                packets: state.packets
             };
 
             const filePath = await fileStorage.saveNetworkState(topology);
@@ -39,7 +40,7 @@ export function SaveLoadControls() {
             const { devices, connections } = await fileStorage.loadNetworkState();
 
             // 3. Очищаем состояние
-            useNetworkStore.setState({ devices: {}, connections: [] });
+            useNetworkStore.setState({ devices: {}, connections: [], packets: {} });
 
             // 4. Даем время на рендер
             await new Promise(resolve => setTimeout(resolve, 100));
