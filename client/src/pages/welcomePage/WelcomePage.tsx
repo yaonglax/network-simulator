@@ -130,7 +130,7 @@ const WelcomePage = () => {
                     />
                 </span>
                 <span className="welcomepage__wrapper-subtitle">Придумай, смоделируй, реализуй</span>
-                <Link to={'/editor'} style={{ textDecoration: 'none' }}>
+                <Link to={'/theory'} style={{ textDecoration: 'none' }}>
                     <Button className='welcomepage__wrapper-btn'>
                         Начать
                     </Button>

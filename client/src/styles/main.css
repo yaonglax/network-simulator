@@ -90,6 +90,20 @@
   font-style: normal;
   font-display: swap;
 }
+@font-face {
+  font-family: "Roboto Medium";
+  src: url("../assets/fonts/Roboto-Medium.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Roboto Regular";
+  src: url("../assets/fonts/Roboto-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 body {
   background-color: var(--bg-dark-gray);
   color: var(--text-gray);
@@ -170,4 +184,11 @@ body {
     background-color: var(--accent-color-purple);
     transition: background-color 0.2s ease-in;
   }
+}
+
+body {
+  -moz-user-select: none;
+       user-select: none;
+  -webkit-user-select: none;
+  font-family: "Roboto Regular";
 }/*# sourceMappingURL=main.css.map */

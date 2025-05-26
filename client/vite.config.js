@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "url";
-import { visualizer } from "rollup-plugin-visualizer";
+// import { visualizer } from "rollup-plugin-visualizer";
 
 export default defineConfig({
   plugins: [
@@ -11,10 +11,10 @@ export default defineConfig({
         plugins: ["@emotion/babel-plugin"],
       },
     }),
-    visualizer({
-      open: false, // Открывать только по необходимости
-      filename: "bundle-stats.html",
-    }),
+    // visualizer({
+    //   open: false, // Открывать только по необходимости
+    //   filename: "bundle-stats.html",
+    // }),
   ],
   resolve: {
     alias: {

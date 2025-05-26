@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useTheme, Theme } from '@mui/material/styles';
 import {
     Box,
@@ -23,6 +23,8 @@ interface OverlayProps {
 interface DrawerProps {
     elementsArray?: string[];
     children?: React.ReactNode;
+    open: boolean;
+    onToggle: () => void;
 }
 
 const DrawerHeader = styled('div')(({ theme }) => ({
@@ -45,13 +47,10 @@ const Overlay = styled('div')<OverlayProps>(({ open }) => ({
     transition: 'opacity 0.3s, visibility 0.3s',
 }));
 
-export default function PersistentDrawerLeft({ elementsArray, children }: DrawerProps) {
-    const [open, setOpen] = useState(false);
-    const theme = useTheme();
+const DRAWER_WIDTH = 250;
 
-    const handleDrawerToggle = () => {
-        setOpen(!open);
-    };
+export default function PersistentDrawerLeft({ elementsArray, children, open, onToggle }: DrawerProps) {
+    const theme = useTheme();
 
     useEffect(() => {
         if (open) {
@@ -66,7 +65,7 @@ export default function PersistentDrawerLeft({ elementsArray, children }: Drawer
 
     return (
         <>
-            <Overlay open={open} onClick={handleDrawerToggle} />
+            <Overlay open={open} onClick={onToggle} />
 
             <Box
                 sx={{
@@ -80,7 +79,7 @@ export default function PersistentDrawerLeft({ elementsArray, children }: Drawer
                     '&:hover': {
                         backgroundColor: 'var(--detail-gray)',
                     },
-                    transform: open ? 'translateX(250px)' : 'none',
+                    transform: open ? `translateX(${DRAWER_WIDTH}px)` : 'none',
                     transition: theme.transitions.create('transform', {
                         easing: theme.transitions.easing.sharp,
                         duration: theme.transitions.duration.enteringScreen,
@@ -91,7 +90,7 @@ export default function PersistentDrawerLeft({ elementsArray, children }: Drawer
                     justifyContent: 'center',
                     cursor: 'pointer'
                 }}
-                onClick={handleDrawerToggle}
+                onClick={onToggle}
                 aria-label="toggle drawer"
             >
                 {open ? <ChevronLeftIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
@@ -99,15 +98,16 @@ export default function PersistentDrawerLeft({ elementsArray, children }: Drawer
 
             <Drawer
                 sx={{
-                    width: 250,
+
                     flexShrink: 0,
                     '& .MuiDrawer-paper': {
-                        width: 250,
+                        width: DRAWER_WIDTH,
                         boxSizing: 'border-box',
                         position: 'fixed',
                         zIndex: 1200,
                         height: '100vh',
                         left: 0,
+                        backgroundColor: 'var(--bg-dark-gray)',
                         transform: open ? 'translateX(0)' : 'translateX(-100%)',
                         transition: theme.transitions.create('transform', {
                             easing: theme.transitions.easing.sharp,
@@ -136,8 +136,12 @@ export default function PersistentDrawerLeft({ elementsArray, children }: Drawer
                 <Box
                     component="main"
                     sx={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        flexDirection: 'column',
+                        alignItems: 'center',
                         flexGrow: 1,
-                        p: 3,
+                        p: '5px',
                         transition: theme.transitions.create('margin', {
                             easing: theme.transitions.easing.sharp,
                             duration: theme.transitions.duration.leavingScreen,

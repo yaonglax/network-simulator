@@ -4,3 +4,9 @@
 @import "../pages/welcomePage/WelcomePage.module.scss";
 
 @import "../shared/ui/Button/CustomButton.module.scss";
+
+body {
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: "Roboto Regular";
+}

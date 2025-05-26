@@ -62,7 +62,47 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
             console.error("Ошибка при соединении портов:", error);
         }
     };
+    const formStyles = {
+        '& .MuiInputBase-input': {
+            color: 'var(--contrast-white)',
+        },
+        '& .MuiOutlinedInput-root': {
+            '& fieldset': {
+                borderColor: 'var(--detail-gray)',
+            },
+            '&:hover fieldset': {
+                borderColor: 'var(--hover-purple)',
+            },
+            '&.Mui-focused fieldset': {
+                borderColor: 'var(--highlight-purple)',
 
+            },
+        },
+        '& .MuiInputLabel-root': {
+            color: 'var(--contrast-white)',
+            '&.Mui-focused': {
+                color: 'var(--highlight-purple)',
+            },
+        },
+        '& .MuiFormHelperText-root': {
+            color: 'rgba(229, 231, 235, 0.5)',
+            '&.Mui-error': {
+                color: '#f44336',
+            },
+        },
+        '& .MuiSelect-icon': {
+            color: 'rgba(229, 231, 235, 0.5)',
+        },
+        '&.Mui-focused .MuiSelect-icon': {
+            color: 'var(--detail-gray)',
+        },
+        '& .MuiCheckbox-root': {
+            color: 'var(--highlight-purple)',
+            '&.Mui-checked': {
+                color: 'var(--highlight-purple)',
+            },
+        },
+    };
     return (
         <Modal open={open} onClose={onClose}>
             <Box sx={{
@@ -71,7 +111,8 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
                 width: 400,
-                bgcolor: 'background.paper',
+                bgcolor: 'var(--bg-dark-gray)',
+                color: 'var(--text-gray)',
                 boxShadow: 24,
                 p: 4,
                 display: 'flex',
@@ -80,7 +121,7 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
             }}>
                 <Typography variant="h6">Соединение портов</Typography>
 
-                <Box>
+                <Box sx={{ backgroundColor: 'var(--bg-dark-gray)', color: 'var(--text-gray)' }}>
                     <Typography>
                         {startDevice?.name || `Устройство ${deviceIdStart}`}
                     </Typography>
@@ -89,11 +130,30 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
                         onChange={(e) => setSelectedStartPort(e.target.value as string)}
                         fullWidth
                         displayEmpty
+                        sx={{
+                            border: '1px solid var(--element-gray)',
+                            color: 'var(--text-gray)',
+                            '& .MuiSelect-icon': {
+                                color: 'var(--highlight-purple)',
+                            },
+                            '&.Mui-focused .MuiSelect-icon': {
+                                color: 'var(--detail-gray)',
+                            },
+                        }}
+                        MenuProps={{
+                            PaperProps: {
+                                sx: {
+                                    backgroundColor: 'var(--bg-dark-gray)',
+                                    color: 'var(--text-gray)',
+
+                                },
+                            },
+                        }}
                     >
                         <MenuItem value="" disabled>Выберите порт</MenuItem>
                         {startDevicePorts.length > 0 ? (
                             startDevicePorts.map((port) => (
-                                <MenuItem key={port.id} value={port.id}>
+                                <MenuItem key={port.id} value={port.id} sx={{ backgroundColor: 'var(--bg-dark-gray)', color: 'var(--text-gray)' }}>
                                     {port.name || port.id} ({startDevice.type === 'switch' ? port.id : port.ip_address})
                                 </MenuItem>
                             ))
@@ -112,6 +172,26 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
                         onChange={(e) => setSelectedEndPort(e.target.value as string)}
                         fullWidth
                         displayEmpty
+                        sx={{
+                            ...formStyles, 
+                            color: 'var(--text-gray)',
+                            border: '1px solid var(--element-gray)',
+                            '& .MuiSelect-icon': {
+                                color: 'var(--highlight-purple)',
+                            },
+                            '&.Mui-focused .MuiSelect-icon': {
+                                color: 'var(--detail-gray)',
+                            },
+                        }}
+                        MenuProps={{
+                            PaperProps: {
+                                sx: {
+                                    backgroundColor: 'var(--bg-dark-gray)',
+                                    color: 'var(--text-gray)',
+
+                                },
+                            },
+                        }}
                     >
                         <MenuItem value="" disabled>
                             Выберите порт
@@ -140,11 +220,22 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
                     onClick={handleConnect}
                     disabled={!selectedStartPort || !selectedEndPort}
                     fullWidth
+                    sx={{
+                        mt: 2,
+                        backgroundColor: '#8053b0',
+                        '&:hover': {
+                            backgroundColor: '#6a4299',
+                        },
+                        '&:disabled': {
+                            backgroundColor: 'rgba(229, 231, 235, 0.1)',
+                            color: 'rgba(229, 231, 235, 0.3)',
+                        }
+                    }}
                 >
                     Соединить
                 </Button>
             </Box>
-        </Modal>
+        </Modal >
     );
 };
 

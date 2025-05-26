@@ -10,7 +10,7 @@ import PortConnectionModal from '@/features/network-topology/components/PortConn
 import PacketEntity from '../PacketEntity/PacketEntity';
 import StartButton from '../StartButton';
 import { SaveLoadControls } from '../SaveLoadControls/SaveLoadControls';
-import { Box } from '@mui/system';
+import { Box, display } from '@mui/system';
 import { DevicesPanel } from '../DevicesPanel/DevicesPanel';
 
 export const NetworkCanvas = () => {
@@ -324,7 +324,7 @@ export const NetworkCanvas = () => {
 
     return (
         <>
-            <Typography variant='h5' color='white' fontWeight={700} margin='15px' alignSelf={'flex-start'}>РАБОЧАЯ ОБЛАСТЬ</Typography>
+            <Typography variant='h5' color='white' fontWeight={700} margin='15px' textAlign={'right'}>NETSIM</Typography>
             <StartButton
                 isPlaying={isPlaying}
                 onToggle={handleToggleSimulation}
