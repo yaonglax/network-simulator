@@ -16,15 +16,26 @@ interface DeviceEntityProps {
     handlePopoverOpen: (event: React.MouseEvent<HTMLElement>) => void,
     handlePopoverClose: () => void,
     onDoubleClick: (e: React.MouseEvent<HTMLElement>) => void,
+    isDraggable?: boolean;
 }
 
-export const DeviceEntity: React.FC<DeviceEntityProps> = ({ device, onContextMenu, handlePopoverOpen, handlePopoverClose, onDoubleClick }) => {
+export const DeviceEntity: React.FC<DeviceEntityProps> = ({
+    device,
+    onContextMenu,
+    handlePopoverOpen,
+    handlePopoverClose,
+    onDoubleClick,
+    isDraggable
+}) => {
     const updateDevice = useNetworkStore((state) => state.updateDevice);
     const [isDragging, setIsDragging] = useState(false);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
 
-
     const handleDragStart = (e: React.DragEvent) => {
+        if (!isDraggable) {
+            e.preventDefault();
+            return;
+        }
         const rect = e.currentTarget.getBoundingClientRect();
         setOffset({
             x: e.clientX - rect.left,
@@ -73,13 +84,22 @@ export const DeviceEntity: React.FC<DeviceEntityProps> = ({ device, onContextMen
         setIsDragging(false);
     };
 
+    // Новый обработчик для блокировки всплытия клика
+    const handleMouseDown = (e: React.MouseEvent<HTMLElement>) => {
+        if (!isDraggable) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    };
+
     return (
         <Box
-            draggable
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
+            draggable={isDraggable}
+            onDragStart={isDraggable ? handleDragStart : undefined}
+            onDragEnd={isDraggable ? handleDragEnd : undefined}
             onContextMenu={handleContextMenu}
             onDoubleClick={handleDoubleClick}
+            onMouseDown={handleMouseDown} // <-- добавлено!
             sx={{
                 position: 'absolute',
                 left: device.x,
@@ -87,7 +107,7 @@ export const DeviceEntity: React.FC<DeviceEntityProps> = ({ device, onContextMen
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                cursor: 'move',
+                cursor: isDraggable ? 'move' : 'not-allowed',
                 opacity: isDragging ? 0.7 : 1,
                 zIndex: isDragging ? 1000 : 1,
             }}

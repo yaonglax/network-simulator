@@ -11,6 +11,7 @@ import PacketEntity from '../PacketEntity/PacketEntity';
 import StartButton from '../StartButton';
 import { SaveLoadControls } from '../SaveLoadControls/SaveLoadControls';
 import { Box, display } from '@mui/system';
+import { willCreateLoop } from '../../utils/loopDetection';
 import { DevicesPanel } from '../DevicesPanel/DevicesPanel';
 
 export const NetworkCanvas = () => {
@@ -162,8 +163,6 @@ export const NetworkCanvas = () => {
             }));
         }
     };
-
-    // === ДОБАВЛЕНО: Проверка на существующее соединение между двумя устройствами ===
     const isDevicesAlreadyConnected = (deviceAId: string, deviceBId: string): boolean => {
         return connections.some(
             (conn) =>
@@ -171,7 +170,7 @@ export const NetworkCanvas = () => {
                 (conn.from.deviceId === deviceBId && conn.to.deviceId === deviceAId)
         );
     };
-    // === КОНЕЦ ДОБАВЛЕНИЯ ===
+
 
     const handleDoubleClick = (e: React.MouseEvent<HTMLElement>, device: Device) => {
         e.preventDefault();
@@ -198,8 +197,6 @@ export const NetworkCanvas = () => {
                 setSelectedStartDevice(null);
                 return;
             }
-
-            // === ДОБАВЛЕНО: Проверка на существующее соединение ===
             if (selectedStartDevice && isDevicesAlreadyConnected(selectedStartDevice.id, device.id)) {
                 setIsDrawingConn(false);
                 setSelectedStartDevice(null);
@@ -207,8 +204,21 @@ export const NetworkCanvas = () => {
                 window.electronAPI?.focus?.forceFocus();
                 return;
             }
-            // === КОНЕЦ ДОБАВЛЕНИЯ ===
-
+            if (
+                selectedStartDevice &&
+                willCreateLoop(
+                    devices,
+                    connections,
+                    selectedStartDevice.id,
+                    device.id
+                )
+            ) {
+                setIsDrawingConn(false);
+                setSelectedStartDevice(null);
+                alert('Соединение приведёт к образованию петли в топологии!');
+                window.electronAPI?.focus?.forceFocus();
+                return;
+            }
             const freePorts = getFreePorts(device.id);
             if (freePorts.length === 0) {
                 setIsDrawingConn(false);
@@ -380,6 +390,7 @@ export const NetworkCanvas = () => {
                         handlePopoverOpen={(e) => handlePopoverOpen(e, device)}
                         handlePopoverClose={handlePopoverClose}
                         onDoubleClick={(e) => handleDoubleClick(e, device)}
+                        isDraggable={!isSimulationRunning}
                     />
                 ))}
 

@@ -30,7 +30,6 @@ const TheoryMarkdownViewer: React.FC<TheoryMarkdownViewerProps> = ({ mdFile, anc
 
     useEffect(() => {
         if (!anchor) return;
-        // Ждём, пока DOM обновится
         setTimeout(() => {
             const el = document.getElementById(anchor);
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -41,9 +40,13 @@ const TheoryMarkdownViewer: React.FC<TheoryMarkdownViewerProps> = ({ mdFile, anc
     if (error) return <Box color="error.main">Ошибка: {error}</Box>;
 
     return (
-        <Box sx={{ background: 'var(--bg-dark-gray)', borderRadius: 2, p: 2, boxShadow: 1, color: 'var(--text-gray)' }}>
-            <ReactMarkdown rehypePlugins={[rehypeRaw]}>{content}</ReactMarkdown>
-        </Box>
+        <>
+            <div id="theory-md-viewer" style={{ backgroundColor: 'var(--bg-dark-gray)', padding: 0 }}>
+                <Box sx={{ background: 'var(--bg-dark-gray)', borderRadius: 2, p: 2, boxShadow: 1, color: 'var(--text-gray)' }}>
+                    <ReactMarkdown rehypePlugins={[rehypeRaw]}>{content}</ReactMarkdown>
+                </Box>
+            </div >
+        </>
     );
 };
 

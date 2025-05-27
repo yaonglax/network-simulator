@@ -22,7 +22,7 @@ interface ControlledAccordionsProps {
   onTopicSelect?: (mdFile: string, anchor?: string) => void;
 }
 
-const accordionData: AccordionSection[] = [
+export const accordionData: AccordionSection[] = [
   {
     mdFile: "intro.md",
     title: "Введение в компьютерные сети",
@@ -33,16 +33,17 @@ const accordionData: AccordionSection[] = [
     ]
   },
   {
-    mdFile: "intro1.md",
+    mdFile: "switching.md",
     title: "Основы сетевой коммутации",
     items: [
       { label: "Понятие коммутации в сетях", anchor: "switching-concept" },
       { label: "Коммутация на уровне каналов (L2) и сетевом уровне (L3)", anchor: "switching-layers" },
-      { label: "Устройства коммутации (хабы, свитчи, маршрутизаторы)", anchor: "switching-devices" }
+      { label: "Устройства коммутации (хабы, свитчи, маршрутизаторы)", anchor: "switching-devices" },
+      { label: "Метод Flooding в коммутаторах", anchor: "flooding-mechanism" }
     ]
   },
   {
-    mdFile: "intro.md",
+    mdFile: "mac-ip.md",
     title: "MAC-адреса и IP-адреса: их роль в сети",
     items: [
       { label: "Что такое MAC-адрес и его структура", anchor: "mac-address-structure" },
@@ -51,7 +52,7 @@ const accordionData: AccordionSection[] = [
     ]
   },
   {
-    mdFile: "intro.md",
+    mdFile: "arp.md",
     title: "ARP-запросы и их назначение",
     items: [
       { label: "Принцип работы ARP (Address Resolution Protocol)", anchor: "arp-principle" },
@@ -60,7 +61,7 @@ const accordionData: AccordionSection[] = [
     ]
   },
   {
-    mdFile: "intro.md",
+    mdFile: "data.md",
     title: "Типы передачи данных в сетях",
     items: [
       { label: "Unicast, Broadcast, Multicast", anchor: "data-types" },
@@ -68,7 +69,7 @@ const accordionData: AccordionSection[] = [
     ]
   },
   {
-    mdFile: "intro.md",
+    mdFile: "mac-table.md",
     title: "Старение MAC-таблицы в коммутаторах",
     items: [
       { label: "Зачем нужно старение записей?", anchor: "mac-aging-why" },
@@ -77,7 +78,7 @@ const accordionData: AccordionSection[] = [
     ]
   },
   {
-    mdFile: "intro.md",
+    mdFile: "vlan.md",
     title: "VLAN: виртуальные локальные сети",
     items: [
       { label: "Понятие VLAN и зачем он нужен", anchor: "vlan-concept" },
@@ -86,7 +87,7 @@ const accordionData: AccordionSection[] = [
     ]
   },
   {
-    mdFile: "intro.md",
+    mdFile: "ping.md",
     title: "PING: проверка связности в сетях",
     items: [
       { label: "Как работает утилита ping?", anchor: "ping-how" },
@@ -95,7 +96,7 @@ const accordionData: AccordionSection[] = [
     ]
   },
   {
-    mdFile: "intro.md",
+    mdFile: "dhcp.md",
     title: "DHCP: автоматическое назначение IP-адресов",
     items: [
       { label: "Принцип работы DHCP-сервера", anchor: "dhcp-principle" },
@@ -104,7 +105,7 @@ const accordionData: AccordionSection[] = [
     ]
   },
   {
-    mdFile: "intro.md",
+    mdFile: "nat.md",
     title: "NAT и трансляция адресов",
     items: [
       { label: "Зачем нужен NAT?", anchor: "nat-why" },
@@ -122,7 +123,7 @@ export default function ControlledAccordions({ onTopicSelect }: ControlledAccord
   };
 
   return (
-    <Box sx={{ width: '100%', maxWidth: 800, mx: 'auto', my: 4, backgroundColor: 'var(--bg-dark-gray)', }}>
+    <Box id="theory-accordion" sx={{ width: '100%', maxWidth: 800, mx: 'auto', my: 4, backgroundColor: 'var(--bg-dark-gray)', }}>
       {accordionData.map((section, index) => (
         <Accordion
           key={`panel${index}`}
@@ -154,6 +155,7 @@ export default function ControlledAccordions({ onTopicSelect }: ControlledAccord
               {section.items.map((item, itemIndex) => (
                 <Button
                   key={itemIndex}
+                  id={itemIndex === 0 ? 'theory-topic-0' : ''}
                   fullWidth
                   sx={{
                     justifyContent: 'flex-start',
