@@ -7,7 +7,7 @@ import {
   MacTableEntry,
 } from "../types";
 
-const MAC_TABLE_ENTRY_TTL = 300_000; // 5 minutes
+const MAC_TABLE_ENTRY_TTL = 300_000;
 let simulationTimeout: ReturnType<typeof setTimeout> | null = null;
 let macAgingInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -50,8 +50,12 @@ export interface NetworkState {
   clearActiveConnection: (connectionId: string) => void;
   ageMacTables: () => void;
   sendPing: (fromDeviceId: string, targetIp: string) => Promise<void>;
-  arpTables: { [deviceId: string]: { [ip: string]: string } }; // IP → MAC
+  arpTables: { [deviceId: string]: { [ip: string]: string } };
   updateArpTable: (deviceId: string, ip: string, mac: string) => void;
+  notifications: { id: string; message: string }[];
+  addNotification: (message: string) => void;
+  removeNotification: (id: string) => void;
+  clearNotifications: () => void;
 }
 
 function findDeviceByIp(
@@ -79,7 +83,6 @@ function buildPathBFS(
     return null;
   }
 
-  // Initialize queue with ports of the starting device
   for (const port of fromDevice.ports) {
     if (port.connectedTo) {
       queue.push({ deviceId: fromDeviceId, portId: port.id });
@@ -152,7 +155,6 @@ function buildPathBFS(
     return null;
   }
 
-  // Build the path
   const path: Array<{ deviceId: string; portId: string; process: any }> = [];
   let cur: Hop | undefined = found;
   while (cur) {
@@ -186,8 +188,6 @@ function buildArpReplyPath(
     );
     return [];
   }
-
-  // Возвращаем путь, где process — пустая функция (или можно добавить обработку)
   return path.map((step) => ({
     deviceId: step.deviceId,
     portId: step.portId,
@@ -233,12 +233,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
           ...safeUpdates,
           type: "switch",
         };
-      } else if (prev.type === "router") {
-        updated = {
-          ...prev,
-          ...safeUpdates,
-          type: "router",
-        };
       } else {
         updated = {
           ...prev,
@@ -255,11 +249,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
 
   removeDevice: (deviceId: string) =>
     set((state) => {
-      // Remove device
       const newDevices = { ...state.devices };
       delete newDevices[deviceId];
 
-      // Remove all connections related to this device
       const newConnections = state.connections
         ? state.connections.filter(
             (conn) =>
@@ -304,7 +296,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         return state;
       }
 
-      // === ДОБАВЛЕНО: Проверка на существующее соединение между этими устройствами ===
       const alreadyConnected = state.connections.some(
         (conn) =>
           (conn.from.deviceId === from.deviceId &&
@@ -319,9 +310,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         window.electronAPI?.focus?.forceFocus?.();
         return state;
       }
-      // === КОНЕЦ ДОБАВЛЕНИЯ ===
 
-      // Check VLAN compatibility
       const isVlanCompatible = checkVlanCompatibility(
         from,
         to,
@@ -571,7 +560,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     );
 
     await hop.process?.(packet, hop.deviceId);
-    await delay(1500); // Задержка анимации
+    await delay(1500);
     await get().processPacket(packetId, hop.deviceId, hop.portId);
   },
 
@@ -584,7 +573,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     const port = device.ports.find((p) => p.id === portId);
     if (!port) return;
 
-    // Check if packet was already processed
     if (packet.isProcessed) {
       console.log(`[PROCESS] Packet ${packetId} already processed, skipping`);
       return;
@@ -597,7 +585,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     }
     get().updatePacket(packetId, { ttl: packet.ttl - 1 });
 
-    // MAC table update (switch)
     if (device.type === "switch" && packet.sourceMAC) {
       get().updateMacTable(
         deviceId,
@@ -609,7 +596,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
 
     // === HOST ===
     if (device.type === "host") {
-      // VLAN: host accepts only if vlanId matches accessVlan of its port
       if (port.isVlanEnabled && port.type === "access") {
         if (packet.vlanId !== port.accessVlan) {
           setTimeout(() => get().removePacket(packetId), 1000);
@@ -636,6 +622,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             arpPayload.type === "ARP-REQUEST" &&
             device.ip_address === arpPayload.targetIp
           ) {
+            get().addNotification(
+              `Устройство ${device.name} (${device.ip_address}) получило ARP-REQUEST от ${packet.sourceMAC}`
+            );
             get().updatePacket(packetId, { isProcessed: true });
 
             const allDevices = get().devices;
@@ -697,7 +686,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
               `[DEBUG] Created ARP-REPLY packet ${replyPacket.id} with path:`,
               replyPacket.path
             );
-            // Проверяем, что путь начинается с текущего устройства
             if (replyPacket.path[0]?.deviceId !== device.id) {
               replyPacket.path.unshift({
                 deviceId: device.id,
@@ -705,20 +693,19 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
                 process: (p: NetworkPacket, devId: string) => {},
               });
             }
-            // НЕ вызываем sendPacket вручную!
-            // await get().sendPacket(replyPacket.id);
-            // console.log(`[DEBUG] Sent ARP-REPLY packet ${replyPacket.id}`);
             return;
           }
           if (
             arpPayload.type === "ARP-REPLY" &&
             device.mac_address === packet.destMAC
           ) {
-            // Обновляем ARP-таблицу только здесь!
             get().updateArpTable(
               device.id,
               arpPayload.senderIp,
               arpPayload.senderMac
+            );
+            get().addNotification(
+              `Устройство ${device.name} (${device.ip_address}) получило ARP-REPLY от ${packet.sourceMAC}`
             );
             console.log(
               `[ARP-REPLY] Delivered to host ${device.id} (${device.mac_address}), updating ARP table and removing packet`
@@ -829,15 +816,11 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         return;
       }
 
-      // Normal packet: deliver if MAC matches
       if (packet.destMAC === device.mac_address) {
         get().updatePacket(packetId, {
           currentHop: packet.currentHop + 1,
         });
-        console.log(
-          `[DELIVERY] Packet ${packet.id} successfully delivered to ${device.id}`
-        );
-        setTimeout(() => get().removePacket(packetId), 5000); // 5s display
+        setTimeout(() => get().removePacket(packetId), 5000);
         return;
       }
 
@@ -1384,16 +1367,28 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         },
       },
     })),
+  notifications: [],
+  addNotification: (message) =>
+    set((state) => ({
+      notifications: [
+        ...state.notifications,
+        { id: `${Date.now()}-${Math.random()}`, message },
+      ],
+    })),
+  removeNotification: (id) =>
+    set((state) => ({
+      notifications: state.notifications.filter((n) => n.id !== id),
+    })),
+  clearNotifications: () => set({ notifications: [] }),
 }));
 
-// Helper function for VLAN compatibility
 function getPortVlan(port: Port): number | undefined {
   if (port.isVlanEnabled) {
     if (port.type === "access" && port.accessVlan !== undefined) {
       return port.accessVlan;
     }
     if (port.type === "trunk" && port.allowedVlanList) {
-      return port.allowedVlanList[0]; // Take first VLAN as an example, can be improved
+      return port.allowedVlanList[0];
     }
   }
   return undefined;
@@ -1405,33 +1400,24 @@ function checkVlanCompatibility(
   fromDevice: Device,
   toDevice: Device
 ): boolean {
-  // Если только у одного из портов включён VLAN — запрещаем соединение
   if (from.isVlanEnabled !== to.isVlanEnabled) {
     return false;
   }
-
-  // If neither port uses VLAN, compatibility is guaranteed
   if (!from.isVlanEnabled && !to.isVlanEnabled) return true;
 
   const fromVlan = getPortVlan(from);
   const toVlan = getPortVlan(to);
-
-  // If both ports are access, VLANs must match
   if (from.type === "access" && to.type === "access") {
     return fromVlan === toVlan;
   }
-
-  // If from is access, to is trunk, trunk must allow from's VLAN
   if (from.type === "access" && to.type === "trunk" && fromVlan !== undefined) {
     return to.allowedVlanList?.includes(fromVlan) || false;
   }
 
-  // If to is access, from is trunk, trunk must allow to's VLAN
   if (from.type === "trunk" && to.type === "access" && toVlan !== undefined) {
     return from.allowedVlanList?.includes(toVlan) || false;
   }
 
-  // If both ports are trunk, VLAN lists must intersect
   if (from.type === "trunk" && to.type === "trunk") {
     if (!from.allowedVlanList || !to.allowedVlanList) return false;
     return from.allowedVlanList.some((vlan) =>
@@ -1439,5 +1425,5 @@ function checkVlanCompatibility(
     );
   }
 
-  return true; // Default compatibility if conditions are undefined
+  return true;
 }

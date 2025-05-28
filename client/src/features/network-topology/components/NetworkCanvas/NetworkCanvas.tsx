@@ -13,6 +13,7 @@ import { SaveLoadControls } from '../SaveLoadControls/SaveLoadControls';
 import { Box, display } from '@mui/system';
 import { willCreateLoop } from '../../utils/loopDetection';
 import { DevicesPanel } from '../DevicesPanel/DevicesPanel';
+import FloodNotification from '../FloodNotification'
 
 export const NetworkCanvas = () => {
     interface LineCoords {
@@ -102,7 +103,8 @@ export const NetworkCanvas = () => {
             const toDevice = devices[conn.to.deviceId];
             if (!fromDevice || !toDevice) return null;
             const isActiveFlood = !!activeConnections[conn.id]?.floodCount;
-            const stroke = isActiveFlood ? 'black' : '#3f51b5';
+            // const stroke = isActiveFlood ? 'black' : '#3f51b5';
+            const stroke = '#3f51b5'
             return {
                 id: conn.id,
                 startX: fromDevice.x + 25,
@@ -451,6 +453,8 @@ export const NetworkCanvas = () => {
                     />
                 ))}
                 <DevicesPanel />
+                <FloodNotification />
+
             </Paper>
             <Box display='flex' flexDirection='row' justifyContent='flex-end' padding='10px 15px'>
                 <SaveLoadControls />

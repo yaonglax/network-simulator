@@ -81,7 +81,7 @@ export function SaveLoadControls() {
     };
 
     return (
-        <div style={{ display: 'flex', gap: '8px', flexDirection: 'row' }}>
+        <div style={{ display: 'flex', gap: '8px', flexDirection: 'row' }} className='save-load-controls-root'>
             <Button
                 variant="contained"
                 onClick={handleSave}

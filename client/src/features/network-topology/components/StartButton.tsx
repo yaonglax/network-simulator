@@ -12,6 +12,7 @@ const StartButton = ({ isPlaying, onToggle }: StartButtonProps) => {
     const packets = useNetworkStore((state) => state.packets)
     return (
         <Button
+            id='start-simulation-btn'
             variant="contained"
             onClick={onToggle}
             disabled={Object.values(packets).length === 0}

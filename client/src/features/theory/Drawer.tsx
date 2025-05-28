@@ -15,6 +15,7 @@ import {
     ChevronRight as ChevronRightIcon
 } from "@mui/icons-material";
 
+
 interface OverlayProps {
     open: boolean;
     theme?: Theme;
@@ -51,6 +52,14 @@ const DRAWER_WIDTH = 250;
 
 export default function PersistentDrawerLeft({ elementsArray, children, open, onToggle }: DrawerProps) {
     const theme = useTheme();
+
+    useEffect(() => {
+        const openDrawer = () => {
+            if (!open) onToggle();
+        };
+        document.addEventListener('openDrawer', openDrawer);
+        return () => document.removeEventListener('openDrawer', openDrawer);
+    }, [open, onToggle]);
 
     useEffect(() => {
         if (open) {
@@ -98,7 +107,6 @@ export default function PersistentDrawerLeft({ elementsArray, children, open, on
 
             <Drawer
                 sx={{
-
                     flexShrink: 0,
                     '& .MuiDrawer-paper': {
                         width: DRAWER_WIDTH,

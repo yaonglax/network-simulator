@@ -15,7 +15,7 @@ export const DevicesPanel = () => {
     e.dataTransfer.effectAllowed = 'move';
   };
   return (
-    <Paper sx={{ paddingTop: 2, paddingLeft: 3, width: '100%', height: 130, position: 'absolute', bottom: 0, left: 0, backgroundColor: 'var(--element-gray)' }}>
+    <Paper className='devices-panel-root' sx={{ paddingTop: 2, paddingLeft: 3, width: '100%', height: 130, position: 'absolute', bottom: 0, left: 0, backgroundColor: 'var(--element-gray)' }}>
       <Typography variant="h5" gutterBottom color='White' fontWeight={700} sx={{ color: 'var(--contrast-white)' }}>
         УСТРОЙСТВА
       </Typography>

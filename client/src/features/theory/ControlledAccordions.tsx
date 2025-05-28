@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import Accordion from '@mui/material/Accordion';
 import AccordionDetails from '@mui/material/AccordionDetails';
@@ -20,6 +19,7 @@ interface AccordionSection {
 
 interface ControlledAccordionsProps {
   onTopicSelect?: (mdFile: string, anchor?: string) => void;
+  expandedIndex?: number | null; // Add expandedIndex prop
 }
 
 export const accordionData: AccordionSection[] = [
@@ -115,15 +115,20 @@ export const accordionData: AccordionSection[] = [
   }
 ];
 
-export default function ControlledAccordions({ onTopicSelect }: ControlledAccordionsProps) {
-  const [expanded, setExpanded] = React.useState<string | false>(false);
+export default function ControlledAccordions({ onTopicSelect, expandedIndex }: ControlledAccordionsProps) {
+  const [expanded, setExpanded] = React.useState<string | false>(expandedIndex != null ? `panel${expandedIndex}` : false);
 
   const handleChange = (panel: string) => (event: React.SyntheticEvent, isExpanded: boolean) => {
     setExpanded(isExpanded ? panel : false);
   };
 
+  React.useEffect(() => {
+    // Update expanded state when expandedIndex changes
+    setExpanded(expandedIndex != null ? `panel${expandedIndex}` : false);
+  }, [expandedIndex]);
+
   return (
-    <Box id="theory-accordion" sx={{ width: '100%', maxWidth: 800, mx: 'auto', my: 4, backgroundColor: 'var(--bg-dark-gray)', }}>
+    <Box id="theory-accordion" sx={{ width: '100%', maxWidth: 800, mx: 'auto', my: 4, backgroundColor: 'var(--bg-dark-gray)' }}>
       {accordionData.map((section, index) => (
         <Accordion
           key={`panel${index}`}
@@ -136,8 +141,7 @@ export default function ControlledAccordions({ onTopicSelect }: ControlledAccord
               margin: 0
             },
             '&::before': {
-              backgroundColor: 'var(--element-gray)', // цвет разделителя
-
+              backgroundColor: 'var(--element-gray)',
             },
           }}
         >
@@ -151,7 +155,7 @@ export default function ControlledAccordions({ onTopicSelect }: ControlledAccord
             </Typography>
           </AccordionSummary>
           <AccordionDetails sx={{ p: 1 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, color: 'var(--text-gray)', }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, color: 'var(--text-gray)' }}>
               {section.items.map((item, itemIndex) => (
                 <Button
                   key={itemIndex}

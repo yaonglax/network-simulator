@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import { Box, CircularProgress } from '@mui/material';
+import { Box, CircularProgress, Typography } from '@mui/material';
 
 interface TheoryMarkdownViewerProps {
     mdFile: string;
@@ -14,7 +14,12 @@ const TheoryMarkdownViewer: React.FC<TheoryMarkdownViewerProps> = ({ mdFile, anc
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!mdFile) return;
+        if (!mdFile) {
+            setContent('');
+            setLoading(false);
+            setError(null);
+            return;
+        }
         setLoading(true);
         setError(null);
         const url = `/theory/${mdFile}`;
@@ -29,24 +34,28 @@ const TheoryMarkdownViewer: React.FC<TheoryMarkdownViewerProps> = ({ mdFile, anc
     }, [mdFile]);
 
     useEffect(() => {
-        if (!anchor) return;
+        if (!anchor || !content) return;
         setTimeout(() => {
             const el = document.getElementById(anchor);
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
     }, [content, anchor]);
 
-    if (loading) return <CircularProgress />;
-    if (error) return <Box color="error.main">Ошибка: {error}</Box>;
-
     return (
-        <>
-            <div id="theory-md-viewer" style={{ backgroundColor: 'var(--bg-dark-gray)', padding: 0 }}>
-                <Box sx={{ background: 'var(--bg-dark-gray)', borderRadius: 2, p: 2, boxShadow: 1, color: 'var(--text-gray)' }}>
-                    <ReactMarkdown rehypePlugins={[rehypeRaw]}>{content}</ReactMarkdown>
-                </Box>
-            </div >
-        </>
+        <Box sx={{ background: 'var(--bg-dark-gray)', borderRadius: 2, p: 2, boxShadow: 1, color: 'var(--text-gray)' }} id='theory-md-viewer'>
+            {loading ? (
+                <CircularProgress />
+            ) : error ? (
+                <Box color="error.main">Ошибка: {error}</Box>
+            ) : content ? (
+                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{content}</ReactMarkdown>
+            ) : (
+                <Typography variant="body1" color="text.secondary">
+                    Выберите тему в меню слева, чтобы просмотреть содержимое.
+                </Typography>
+            )}
+        </Box>
+
     );
 };
 
