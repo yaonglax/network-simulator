@@ -18,7 +18,7 @@ const StartButton = ({ isPlaying, onToggle }: StartButtonProps) => {
             disabled={Object.values(packets).length === 0}
             startIcon={isPlaying ? <Pause /> : <PlayArrow />}
             sx={{
-                position: 'absolute', right: '60px', top: '90px', zIndex: 1000, backgroundColor: isPlaying ? 'var(--accent-purple)' : 'var(--element-gray)', color: 'var(--contrast-white)',
+                zIndex: 1000, backgroundColor: isPlaying ? 'var(--accent-purple)' : 'var(--element-gray)', color: 'var(--contrast-white)',
                 '&:hover': { bgcolor: 'var(--hover-purple)', boxShadow: '0px 0px 1px var(--highlight-purple)', color: 'var(--text-gray)' },
             }}
         >

@@ -84,7 +84,7 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
         return ipRegex.test(ip);
     };
 
-    // Проверка: нельзя отправлять пакет самому себе (MAC)
+    // нельзя отправлять пакет самому себе
     const isSelfMac = () => {
         if (!selectedPortId) return false;
         const sourcePort = device.ports?.find((p) => p.id === selectedPortId);
@@ -92,7 +92,7 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
         return destMAC.toLowerCase() === sourceMAC?.toLowerCase();
     };
 
-    // Проверка: нельзя отправлять пакет самому себе (IP)
+    //  нельзя отправлять пакет самому себе 
     const isSelfIp = (targetIp: string) => {
         return device.ip_address && targetIp === device.ip_address;
     };
@@ -140,8 +140,7 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
         }
 
         if (packetType === "PING") {
-            // Для ping используем sendPing (он сам формирует пакет)
-            // Отправляем ping с каждого активного порта (если нужно)
+
             activePorts.forEach(() => {
                 sendPing(device.id, pingTargetIp);
             });
@@ -150,7 +149,7 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
         }
 
         if (packetType === "ARP") {
-            // ARP-запрос — широковещательный MAC
+            // ARP-запрос 
             activePorts.forEach((port) => {
                 const arpPacket: NetworkPacket = {
                     id: `arp-${Date.now()}-${port.id}`,
@@ -182,7 +181,7 @@ const PacketModal = ({ device, handlePopoverClose }: PacketModalProps) => {
             return;
         }
 
-        // Обычный DATA-пакет (unicast/broadcast)
+        // Обычный DATA-пакет
         activePorts.forEach((port) => {
             const dataPacket: NetworkPacket = {
                 id: `data-${Date.now()}-${port.id}`,

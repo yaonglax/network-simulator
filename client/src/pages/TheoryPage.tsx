@@ -2,61 +2,72 @@ import React, { useState, useEffect } from 'react';
 import PersistentDrawerLeft from '@/features/theory/Drawer';
 import ControlledAccordions, { accordionData as theorySections } from '@/features/theory/ControlledAccordions';
 import TheoryMarkdownViewer from '@/features/theory/TheoryMarkdownViewer';
-import { Box, Button, Typography, Stack, IconButton } from '@mui/material';
-import { Link } from 'react-router-dom';
+import { Box, Button, Stack, IconButton, Typography, Tooltip } from '@mui/material';
+import { Link, useNavigate } from 'react-router-dom';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import Joyride, { CallBackProps, STATUS, Step } from 'react-joyride';
+import { HelpOutline } from '@mui/icons-material';
+import { tourSteps, GLOBAL_TOUR_KEY } from '../features/theory/tourSteps';
 
 const DRAWER_WIDTH = 250;
-const TOUR_KEY = 'theoryTourCompleted';
+
+const defaultMarkdownContent = `
+# Добро пожаловать в раздел теории! 🎉
+
+<div style="position: relative; display: flex; justify-content: center; flex-direction: column; alignItems: center; margin: 20px 0;">
+  <div class="note">
+    <strong>Привет!</strong> Это раздел теории, где ты можешь узнать всё о компьютерных сетях: от базовых понятий до сложных протоколов.
+  </div>
+</div>
+
+## Что здесь можно найти?
+
+<div style="display: flex; gap: 20px; margin: 20px 0;">
+  <div style="flex: 1; border: 1px solid var(--detail-gray); border-radius: 0.5rem; padding: 15px;">
+    <h3 style="margin-top: 0;">Основы сетей</h3>
+    <p>Узнай, как устроены сети, что такое IP и MAC-адреса, и как работает передача данных.</p>
+  </div>
+  <div style="flex: 1; border: 1px solid var(--detail-gray); border-radius: 0.5rem; padding: 15px;">
+    <h3 style="margin-top: 0;">Протоколы</h3>
+    <p>Погрузись в детали работы ARP, DHCP, OSPF и других протоколов.</p>
+  </div>
+  <div style="flex: 1; border: 1px solid var(--detail-gray); border-radius: 0.5rem; padding: 15px;">
+    <h3 style="margin-top: 0;">Практические примеры</h3>
+    <p>Изучай реальные сценарии использования и сравнения технологий.</p>
+  </div>
+</div>
+
+## Как начать?
+
+- Выбери тему из списка слева, чтобы изучить теорию.
+- Перейди к редактору топологий, чтобы применить знания на практике!
+
+<div style="position: relative; display: flex; justify-content: center; flex-direction: column; align-items: center; margin: 20px 0;">
+  <div class="note">
+    <strong>Совет:</strong> Используй стрелки внизу страницы, чтобы переходить между разделами.
+    <img src="/cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
+  </div>
+</div>
+
+<style>
+  table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+  th, td { padding: 12px 15px; border: 1px solid var(--detail-gray); text-align: left; }
+  th { background-color: var(--element-gray); font-weight: bold; }
+  tr:nth-child(even) { background-color: var(--element-gray); }
+  .note { border-left: 4px solid var(--highlight-purple); background-color: var(--element-gray); width: 80%; min-height: 60px; border-radius: 0.5rem; padding: 15px; position: relative; margin-top: 15px; }
+  .note.warning { border-left-color: var(--warning-orange); }
+  @media (max-width: 768px) {
+    .comparison-cards { flex-direction: column; }
+    .illustration img, .note { width: 95%; }
+  }
+</style>
+`;
 
 const sectionList = theorySections.map(section => ({
     title: section.title,
     mdFile: section.mdFile,
 }));
-
-const joyrideSteps: Step[] = [
-    {
-        target: 'body',
-        title: 'Добро пожаловать!',
-        content: (
-            <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-                <img src="/cat4.svg" alt="Маскот" style={{ width: '140px', position: 'absolute', bottom: '75%', left: '-30%', rotate: '-15deg' }} />
-                <span>Это обучающий тур по интерфейсу теории. Нажмите "Далее", чтобы начать!</span>
-            </div>
-        ),
-        placement: 'center',
-        disableBeacon: true,
-    },
-    {
-        target: '#theory-accordion',
-        title: 'Список тем',
-        content: (
-            <span>Здесь находится список с темами. Выберите интересующую тему для просмотра теории.</span>
-        ),
-        placement: 'right',
-        disableBeacon: true,
-    },
-    {
-        target: '#theory-md-viewer',
-        title: 'Просмотр теории',
-        content: (
-            <span>В этой области отображается выбранная теория. Мы открыли первую тему автоматически.</span>
-        ),
-        placement: 'bottom',
-        disableBeacon: true,
-    },
-    {
-        target: '#mui-button-to-editor',
-        title: 'Перейти к практике',
-        content: (
-            <span>Нажмите эту кнопку, чтобы перейти к редактору топологий и начать практиковаться!</span>
-        ),
-        placement: 'top',
-        disableBeacon: true,
-    },
-];
 
 const TheoryPage = () => {
     const [selected, setSelected] = useState<{ mdFile: string, anchor?: string } | null>(null);
@@ -65,11 +76,16 @@ const TheoryPage = () => {
     const [runTour, setRunTour] = useState(false);
     const [stepIndex, setStepIndex] = useState(0);
     const [firstTopicOpened, setFirstTopicOpened] = useState(false);
+    const navigate = useNavigate();
 
     useEffect(() => {
-        const completed = localStorage.getItem(TOUR_KEY);
-        if (!completed) {
+        const tourState = JSON.parse(localStorage.getItem(GLOBAL_TOUR_KEY) || '{}');
+        if (tourState.completed) {
+            setRunTour(false);
+            setStepIndex(0);
+        } else {
             setRunTour(true);
+            setStepIndex(tourState.stepIndex || 0);
         }
     }, []);
 
@@ -79,7 +95,7 @@ const TheoryPage = () => {
         setFirstTopicOpened(false);
         setSelected(null);
         setExpandedAccordion(0);
-        localStorage.removeItem(TOUR_KEY);
+        localStorage.setItem(GLOBAL_TOUR_KEY, JSON.stringify({ stepIndex: 0, completed: false }));
     };
 
     useEffect(() => {
@@ -95,11 +111,18 @@ const TheoryPage = () => {
 
         if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
             setRunTour(false);
-            localStorage.setItem(TOUR_KEY, '1');
+            localStorage.setItem(GLOBAL_TOUR_KEY, JSON.stringify({ stepIndex: 0, completed: true }));
             return;
         }
+
         if (type === 'step:after' || type === 'error:target_not_found') {
-            setStepIndex(index + 1);
+            const newIndex = index + 1;
+            setStepIndex(newIndex);
+            localStorage.setItem(GLOBAL_TOUR_KEY, JSON.stringify({ stepIndex: newIndex, completed: false }));
+
+            if (newIndex === 4) {
+                navigate('/editor');
+            }
             return;
         }
     };
@@ -114,7 +137,7 @@ const TheoryPage = () => {
     return (
         <Box sx={{ display: 'flex', backgroundColor: 'var(--element-gray)', borderRadius: '1rem', color: 'var(--text-gray)', fontSize: '16px' }}>
             <Joyride
-                steps={joyrideSteps}
+                steps={tourSteps}
                 run={runTour}
                 stepIndex={stepIndex}
                 continuous
@@ -184,6 +207,11 @@ const TheoryPage = () => {
                 open={drawerOpen}
                 onToggle={() => setDrawerOpen((prev) => !prev)}
             >
+                <Tooltip title='Начать туториал'>
+                    <IconButton onClick={startTour} sx={{ position: 'absolute', left: 0, top: 0, color: 'var(--detail-gray)', width: '25px' }}>
+                        <HelpOutline fontSize='small' />
+                    </IconButton>
+                </Tooltip>
                 <Link to="/editor">
                     <Button
                         id="mui-button-to-editor"
@@ -229,7 +257,7 @@ const TheoryPage = () => {
                         : '100%',
                 }}
             >
-                <TheoryMarkdownViewer mdFile={selected?.mdFile || ''} anchor={selected?.anchor} />
+                <TheoryMarkdownViewer mdFile={selected?.mdFile || ''} anchor={selected?.anchor} defaultContent={defaultMarkdownContent} />
                 {selected && (
                     <Stack
                         className="navigation-arrows"

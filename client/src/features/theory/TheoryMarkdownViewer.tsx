@@ -1,21 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import { Box, CircularProgress, Typography } from '@mui/material';
+import { Box, CircularProgress } from '@mui/material';
 
 interface TheoryMarkdownViewerProps {
     mdFile: string;
     anchor?: string;
+    defaultContent?: string;
 }
 
-const TheoryMarkdownViewer: React.FC<TheoryMarkdownViewerProps> = ({ mdFile, anchor }) => {
+const TheoryMarkdownViewer: React.FC<TheoryMarkdownViewerProps> = ({ mdFile, anchor, defaultContent }) => {
     const [content, setContent] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!mdFile) {
-            setContent('');
+            setContent(defaultContent || '');
             setLoading(false);
             setError(null);
             return;
@@ -31,7 +32,7 @@ const TheoryMarkdownViewer: React.FC<TheoryMarkdownViewerProps> = ({ mdFile, anc
             .then(setContent)
             .catch((e) => setError(e.message))
             .finally(() => setLoading(false));
-    }, [mdFile]);
+    }, [mdFile, defaultContent]);
 
     useEffect(() => {
         if (!anchor || !content) return;
@@ -47,15 +48,10 @@ const TheoryMarkdownViewer: React.FC<TheoryMarkdownViewerProps> = ({ mdFile, anc
                 <CircularProgress />
             ) : error ? (
                 <Box color="error.main">Ошибка: {error}</Box>
-            ) : content ? (
-                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{content}</ReactMarkdown>
             ) : (
-                <Typography variant="body1" color="text.secondary">
-                    Выберите тему в меню слева, чтобы просмотреть содержимое.
-                </Typography>
+                <ReactMarkdown rehypePlugins={[rehypeRaw]}>{content}</ReactMarkdown>
             )}
         </Box>
-
     );
 };
 

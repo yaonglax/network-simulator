@@ -27,7 +27,7 @@ export const FloodNotification = () => {
                 severity="success"
                 variant="filled"
                 onClose={() => latest && removeNotification(latest.id)}
-                sx={{ minWidth: 300 }}
+                sx={{ minWidth: 300, zIndex: 4000 }}
             >
                 {latest?.message}
             </Alert>

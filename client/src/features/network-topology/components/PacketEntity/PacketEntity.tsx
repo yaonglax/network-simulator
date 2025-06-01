@@ -14,7 +14,7 @@ const PacketEntity = ({ packetId, isPlaying }: PacketEntityProps) => {
     const canvasRef = useRef<HTMLElement | null>(null);
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
     const packetRef = useRef<HTMLDivElement | null>(null);
-    const [animationComplete, setAnimationComplete] = useState(true); // Track animation status
+    const [animationComplete, setAnimationComplete] = useState(true);
 
     useLayoutEffect(() => {
         const canvas = document.getElementById('network-canvas');

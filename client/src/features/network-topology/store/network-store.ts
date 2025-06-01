@@ -56,6 +56,9 @@ export interface NetworkState {
   addNotification: (message: string) => void;
   removeNotification: (id: string) => void;
   clearNotifications: () => void;
+  logs: string[];
+  addLog: (message: string) => void;
+  clearLogs: () => void;
 }
 
 function findDeviceByIp(
@@ -72,7 +75,7 @@ function buildPathBFS(
   connections: Connection[]
 ): Array<{ deviceId: string; portId: string; process: any }> | null {
   type Hop = { deviceId: string; portId: string; prev?: Hop };
-  const visited = new Set<string>(); // Track deviceId:portId
+  const visited = new Set<string>(); 
   const queue: Hop[] = [];
 
   const fromDevice = devices[fromDeviceId];
@@ -102,7 +105,7 @@ function buildPathBFS(
     const device = devices[hop.deviceId];
     if (!device) continue;
 
-    // Если это switch, добавляем переходы между всеми его портами (кроме текущего)
+    // Если это switch, добавляем переходы между всеми его портами
     if (device.type === "switch") {
       for (const port of device.ports) {
         const hopKey = `${device.id}:${port.id}`;
@@ -117,12 +120,10 @@ function buildPathBFS(
       }
     }
 
-    // Check connections, interpreting them as bidirectional
     for (const conn of connections) {
       let nextDeviceId: string | null = null;
       let nextPortId: string | null = null;
 
-      // Forward direction
       if (
         conn.from.deviceId === hop.deviceId &&
         conn.from.portId === hop.portId
@@ -130,7 +131,6 @@ function buildPathBFS(
         nextDeviceId = conn.to.deviceId;
         nextPortId = conn.to.portId;
       }
-      // Reverse direction
       else if (
         conn.to.deviceId === hop.deviceId &&
         conn.to.portId === hop.portId
@@ -258,8 +258,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
               conn.from.deviceId !== deviceId && conn.to.deviceId !== deviceId
           )
         : [];
-
-      // Create new devices object with cleaned ports
       const cleanedDevices: typeof newDevices = {};
       Object.entries(newDevices).forEach(([id, device]) => {
         cleanedDevices[id] = {
@@ -319,9 +317,11 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       );
       if (!isVlanCompatible) {
         alert(
-          `VLAN mismatch: port ${from.name} (VLAN ${getPortVlan(
+          `Несовпадение VLAN: порт ${from.name} (VLAN ${getPortVlan(
             from
-          )}) cannot be connected to port ${to.name} (VLAN ${getPortVlan(to)}).`
+          )}) не может быть подключён к порту ${to.name} (VLAN ${getPortVlan(
+            to
+          )}).`
         );
         window.electronAPI?.focus.forceFocus();
         return state;
@@ -402,8 +402,13 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       if (!sourceDevice) return state;
       const sourcePort = sourceDevice.ports.find((p) => p.id === sourcePortId);
       if (!sourcePort || !sourcePort.connectedTo) return state;
-
-      // VLAN обработка (оставь как есть)
+      const logMessage = `Пакет создан: sourceMAC=${
+        packet.sourceMAC
+      }, destMAC=${packet.destMAC || "не указан"}, type=${
+        packet.type
+      }, payload=${packet.payload || "нет данных"}`;
+      state.addLog(logMessage);
+      // VLAN обработка
       let effectiveVlanId = packet.vlanId;
       if (
         sourcePort.isVlanEnabled &&
@@ -413,7 +418,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         effectiveVlanId = sourcePort.accessVlan;
       }
 
-      // --- ВАЖНО: path ---
       let path = packet.path;
       const isUnicast =
         destMAC &&
@@ -423,7 +427,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
 
       if (!Array.isArray(path) || path.length === 0) {
         if (isUnicast && packet.type === "DATA") {
-          // DATA: только первый хоп
           path = [
             {
               deviceId: sourceDeviceId,
@@ -437,7 +440,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             },
           ];
         } else if (isUnicast) {
-          // Остальные unicast (PING, ARP-REPLY): полный маршрут
           const destDevice = Object.values(state.devices).find(
             (d) => d.mac_address === destMAC
           );
@@ -450,7 +452,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             );
           }
         }
-        // Fallback: если path всё ещё не построен
+        // если path всё ещё не построен
         if (!path || path.length === 0) {
           path = [
             {
@@ -516,16 +518,23 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     const state = get();
     const packet = state.packets[packetId];
     if (!packet) {
+      state.addLog(`Ошибка: пакет ${packetId} не найден`);
       console.warn(`[ERROR] Packet ${packetId} not found`);
       return;
     }
 
     if (!packet.isPlaying) {
+      state.addLog(`Ошибка: пакет ${packetId} не воспроизводится`);
       console.warn(`[ERROR] Packet ${packetId} is not playing`);
       return;
     }
 
     if (packet.currentHop >= packet.path.length) {
+      state.addLog(
+        `Пакет ${packetId} успешно доставлен до устройства ${
+          packet.path[packet.path.length - 1]?.deviceId
+        }`
+      );
       console.log(
         `[DELIVERY] Packet ${packetId} successfully delivered to ${
           packet.path[packet.path.length - 1]?.deviceId
@@ -537,6 +546,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
 
     const hop = packet.path[packet.currentHop];
     if (!hop) {
+      state.addLog(
+        `Ошибка: хоп на шаге ${packet.currentHop} не найден для пакета ${packetId}`
+      );
       console.error(
         `[ERROR] No hop at currentHop ${packet.currentHop} for packet ${packetId}, path:`,
         packet.path
@@ -547,13 +559,18 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
 
     const device = state.devices[hop.deviceId];
     if (!device) {
+      state.addLog(
+        `Ошибка: устройство ${hop.deviceId} не найдено для пакета ${packetId}`
+      );
       console.error(
         `[ERROR] Device ${hop.deviceId} not found for packet ${packetId}`
       );
       get().removePacket(packetId);
       return;
     }
-
+    state.addLog(
+      `Отправка пакета ${packetId} на устройство ${hop.deviceId} на шаге ${packet.currentHop}`
+    );
     console.log(
       `[DEBUG] Sending packet ${packetId} to device ${hop.deviceId} at hop ${packet.currentHop}, path:`,
       packet.path
@@ -573,8 +590,12 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     const port = device.ports.find((p) => p.id === portId);
     if (!port) return;
 
+    state.addLog(
+      `Пакет ${packet.id} обрабатывается на устройстве ${deviceId} (тип: ${device.type}) через порт ${portId}`
+    );
+
     if (packet.isProcessed) {
-      console.log(`[PROCESS] Packet ${packetId} already processed, skipping`);
+      state.addLog(`Пакет ${packetId} уже обработан, пропускается`);
       return;
     }
 
@@ -598,12 +619,14 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     if (device.type === "host") {
       if (port.isVlanEnabled && port.type === "access") {
         if (packet.vlanId !== port.accessVlan) {
+          state.addLog(
+            `Пакет ${packetId} удалён: VLAN не совпадает (порт: ${port.accessVlan}, пакет: ${packet.vlanId})`
+          );
           setTimeout(() => get().removePacket(packetId), 1000);
           return;
         }
       }
 
-      // Flood highlight
       const connection = state.connections.find(
         (c) =>
           (c.from.deviceId === deviceId && c.from.portId === portId) ||
@@ -623,6 +646,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             device.ip_address === arpPayload.targetIp
           ) {
             get().addNotification(
+              `Устройство ${device.name} (${device.ip_address}) получило ARP-REQUEST от ${packet.sourceMAC}`
+            );
+            state.addLog(
               `Устройство ${device.name} (${device.ip_address}) получило ARP-REQUEST от ${packet.sourceMAC}`
             );
             get().updatePacket(packetId, { isProcessed: true });
@@ -647,6 +673,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             if (!replyPath || replyPath.length === 0) {
               console.error(
                 `[ERROR] No path for ARP-REPLY from ${device.id} to ${senderDevice.id}`
+              );
+              state.addLog(
+                `Ошибка: не удалось построить путь для ARP-REPLY от ${device.id} к ${senderDevice.id}`
               );
               get().removePacket(packetId);
               return;
@@ -682,6 +711,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
               get().tickSimulation();
             }
             get().removePacket(packetId);
+            state.addLog(
+              `Создан ARP-REPLY пакет ${replyPacket.id} от ${device.id} к ${senderDevice.id}`
+            );
             console.log(
               `[DEBUG] Created ARP-REPLY packet ${replyPacket.id} with path:`,
               replyPacket.path
@@ -707,6 +739,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             get().addNotification(
               `Устройство ${device.name} (${device.ip_address}) получило ARP-REPLY от ${packet.sourceMAC}`
             );
+            state.addLog(
+              `Устройство ${device.name} (${device.ip_address}) получило ARP-REPLY от ${packet.sourceMAC}`
+            );
             console.log(
               `[ARP-REPLY] Delivered to host ${device.id} (${device.mac_address}), updating ARP table and removing packet`
             );
@@ -723,7 +758,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       if (packet.type === "PING" && packet.payload) {
         try {
           const pingPayload = JSON.parse(packet.payload);
-          // Recipient of ping request
+       
           if (
             pingPayload.type === "PING-REQUEST" &&
             device.mac_address === packet.destMAC
@@ -735,6 +770,12 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
               (d) => d.mac_address === packet.sourceMAC
             );
             if (!senderDevice) {
+              state.addLog(
+                `Ошибка: устройство с MAC ${packet.sourceMAC} не найдено для PING`
+              );
+              state.addLog(
+                `Ошибка: устройство с MAC ${packet.sourceMAC} не найдено`
+              );
               get().removePacket(packetId);
               return;
             }
@@ -764,14 +805,15 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
               ttl: 64,
               type: "PING",
               visited: new Set<string>(),
-              sentAt: Date.now(), // Update sentAt for accurate RTT
+              sentAt: Date.now(),
               isProcessed: false,
               isPlaying: get().isSimulationRunning ? true : false,
             };
             get().addPacket(replyPacket);
             get().removePacket(packetId);
             const totalHops = replyPath.length - 1;
-            const pingDelay = totalHops * 2000 + 2000; // Увеличиваем задержку
+            const pingDelay = totalHops * 2000 + 2000;
+            state.addLog(`Создан PING-REPLY пакет ${replyPacket.id}`);
             console.log(
               `[DEBUG] PING reply delay set to ${pingDelay} ms for ${totalHops} hops`
             );
@@ -781,7 +823,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
                 set({ isSimulationRunning: true });
                 get().tickSimulation();
               }
-              // await get().sendPacket(replyPacket.id); // tickSimulation сам подхватит
             }, pingDelay);
 
             return;
@@ -791,11 +832,14 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             device.mac_address === packet.destMAC
           ) {
             const rtt = packet.sentAt ? Date.now() - packet.sentAt : undefined;
+            state.addLog(
+              `Пакет ${packetId} успешно доставлен: PING-REPLY получен устройством ${device.id}, RTT=${rtt} мс`
+            );
             console.log(
               `[PING] Host ${device.name} (${device.mac_address}) received reply, RTT = ${rtt} ms, packet:`,
               packet
             );
-            // Сразу помечаем пакет как завершённый
+     
             get().updatePacket(packetId, {
               isPlaying: false,
               isProcessed: true,
@@ -806,17 +850,23 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             return;
           }
         } catch (e) {
+          state.addLog(`Ошибка при разборе PING payload: ${e}`);
           console.error(`[ERROR] Parsing PING payload: ${e}`);
         }
       }
 
-      // Flood packet disappears on any host except sender (currentHop > 0)
       if (packet.isFlooded && packet.currentHop > 0) {
+        state.addLog(
+          `Пакет ${packetId} удалён: флуд на хосте (currentHop > 0)`
+        );
         setTimeout(() => get().removePacket(packetId), 4000);
         return;
       }
 
       if (packet.destMAC === device.mac_address) {
+        state.addLog(
+          `Пакет ${packetId} успешно доставлен: совпадение MAC-адреса на устройстве ${device.id}`
+        );
         get().updatePacket(packetId, {
           currentHop: packet.currentHop + 1,
         });
@@ -824,7 +874,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         return;
       }
 
-      // If there’s a next hop, forward it
       if (packet.currentHop < packet.path.length - 1) {
         const nextHop = packet.path[packet.currentHop + 1];
         const nextDevice = state.devices[nextHop.deviceId];
@@ -834,6 +883,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             nextPort.type === "access" &&
             packet.vlanId !== nextPort.accessVlan
           ) {
+            state.addLog(
+              `Пакет ${packetId} удалён: VLAN не совпадает на следующем хопе`
+            );
             setTimeout(() => get().removePacket(packetId), 1000);
             return;
           }
@@ -841,17 +893,20 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             nextPort.type === "trunk" &&
             !nextPort.allowedVlanList?.includes(packet.vlanId!)
           ) {
+            state.addLog(
+              `Пакет ${packetId} удалён: VLAN не разрешён на trunk-порте`
+            );
             setTimeout(() => get().removePacket(packetId), 1000);
             return;
           }
         }
-        // Update state atomically
+   
         get().updatePacket(packetId, {
           currentHop: packet.currentHop + 1,
           x: nextDevice?.x ?? packet.x,
           y: nextDevice?.y ?? packet.y,
         });
-        // Wait for the animation duration (1500 ms) before processing the next hop
+
         await delay(1500);
         await get().processPacket(packetId, nextHop.deviceId, nextHop.portId);
         return;
@@ -873,6 +928,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       ) {
         effectiveVlanId = port.accessVlan;
         get().updatePacket(packetId, { vlanId: effectiveVlanId });
+        state.addLog(
+          `Коммутатор ${deviceId} добавил VLAN=${effectiveVlanId} для пакета ${packet.id} на access-порту`
+        );
         console.log(
           `[SWITCH] ${deviceId} tagging packet ${packet.id} with VLAN=${effectiveVlanId} on access port ${portId}`
         );
@@ -882,10 +940,11 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         packet.visited instanceof Set
           ? packet.visited
           : new Set(packet.visited || []);
-      const hopKey = `${device.id}:${port.id}`; // Упрощённый ключ
-
-      // Проверку loop делаем только для flood-пакетов
+      const hopKey = `${device.id}:${port.id}`; 
       if (packet.isFlooded && visited.has(hopKey)) {
+        state.addLog(
+          `Коммутатор ${deviceId} удалил пакет ${packet.id}: обнаружен цикл`
+        );
         console.log(
           `[SWITCH] ${deviceId} drops packet ${packet.id}: forwarding loop detected, visited:`,
           Array.from(visited),
@@ -898,7 +957,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       visited.add(hopKey);
       get().updatePacket(packetId, { visited });
 
-      // Update macTables for ARP-REPLY
       if (packet.type === "ARP" && packet.payload) {
         try {
           const arpPayload = JSON.parse(packet.payload);
@@ -909,16 +967,19 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
               portId,
               effectiveVlanId ?? 0
             );
+            state.addLog(
+              `Коммутатор ${deviceId} обновил таблицу MAC: ${arpPayload.senderMac} → порт ${portId}`
+            );
             console.log(
               `[SWITCH] ${deviceId} updated macTables: ${arpPayload.senderMac} → port ${portId}`
             );
           }
         } catch (e) {
+          state.addLog(`Ошибка при разборе ARP payload на коммутаторе: ${e}`);
           console.error(`[ERROR] Parsing ARP payload in switch: ${e}`);
         }
       }
 
-      // If there’s a next hop in path, check VLAN and forward
       if (packet.currentHop < packet.path.length - 1) {
         const nextHop = packet.path[packet.currentHop + 1];
         const nextDevice = state.devices[nextHop.deviceId];
@@ -928,6 +989,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             nextPort.type === "access" &&
             packet.vlanId !== nextPort.accessVlan
           ) {
+            state.addLog(
+              `Пакет ${packetId} удалён: VLAN не совпадает на следующем хопе (коммутатор)`
+            );
             setTimeout(() => get().removePacket(packetId), 1000);
             return;
           }
@@ -935,25 +999,24 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             nextPort.type === "trunk" &&
             !nextPort.allowedVlanList?.includes(packet.vlanId!)
           ) {
+            state.addLog(
+              `Пакет ${packetId} удалён: VLAN не разрешён на trunk-порте (коммутатор)`
+            );
             setTimeout(() => get().removePacket(packetId), 1000);
             return;
           }
         }
-        // Update state atomically
         get().updatePacket(packetId, {
           currentHop: packet.currentHop + 1,
           x: nextDevice?.x ?? packet.x,
           y: nextDevice?.y ?? packet.y,
         });
-        // Dynamic delay based on remaining hops (minimum 1500 ms per hop)
         const remainingHops = packet.path.length - (packet.currentHop + 1);
-        const delayTime = Math.max(1500, remainingHops * 1500); // Ensure at least 1500 ms
+        const delayTime = Math.max(1500, remainingHops * 1500);
         await delay(delayTime);
         await get().processPacket(packetId, nextHop.deviceId, nextHop.portId);
         return;
       }
-
-      // If no next hop but destMAC exists, look in MAC table
       const vlanId = effectiveVlanId ?? 0;
       const macTable = state.macTables[deviceId]?.[vlanId] ?? {};
       const destPortId = macTable[packet.destMAC]?.portId;
@@ -969,6 +1032,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
               destPort.type === "access" &&
               effectiveVlanId !== destPort.accessVlan
             ) {
+              state.addLog(
+                `Пакет ${packetId} удалён: VLAN не совпадает на выходном порте`
+              );
               setTimeout(() => get().removePacket(packetId), 1000);
               return;
             }
@@ -976,6 +1042,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
               destPort.type === "trunk" &&
               !destPort.allowedVlanList?.includes(effectiveVlanId!)
             ) {
+              state.addLog(
+                `Пакет ${packetId} удалён: VLAN не разрешён на trunk-порте (выход)`
+              );
               setTimeout(() => get().removePacket(packetId), 1000);
               return;
             }
@@ -1005,13 +1074,22 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         }
       }
 
-      // FLOODING: if no MAC in table or it’s a broadcast
+      // FLOODING
       if (
         !destPortId ||
         packet.isFlooded ||
         !packet.destMAC ||
         packet.destMAC === "FF:FF:FF:FF:FF:FF"
       ) {
+        if (!destPortId) {
+          state.addLog(
+            `Коммутатор ${deviceId} не нашёл MAC-адрес ${packet.destMAC}, выполняется флуд`
+          );
+        } else {
+          state.addLog(
+            `Пакет ${packet.id} флудится на устройстве ${deviceId} (broadcast)`
+          );
+        }
         const portsToFlood = device.ports.filter((p) => {
           // Не флудим во входящий порт
           if (p.id === port.id) return false;
@@ -1037,8 +1115,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
           }
           return true;
         });
-        // Wait for the animation of the incoming packet to complete
-        await delay(1500); // Matches the animation duration in PacketEntity
+        await delay(1500); 
         await Promise.all(
           portsToFlood.map(async (floodPort) => {
             const nextDeviceId = floodPort.connectedTo!.deviceId;
@@ -1046,6 +1123,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             const nextDevice = state.devices[nextDeviceId];
             const visitKey = `${nextDeviceId}:${nextPortId}`;
             if (visited.has(visitKey)) return;
+            state.addLog(
+              `Пакет ${packet.id} флудится на устройстве ${deviceId} через порт ${floodPort.id} → ${nextDeviceId}:${nextPortId}`
+            );
             console.log(
               `[SWITCH] ${deviceId} FLOOD packet ${packet.id} on port ${floodPort.id} → ${nextDeviceId}:${nextPortId}`
             );
@@ -1108,7 +1188,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       return;
     }
 
-    // If device type is undefined, remove packet
     get().removePacket(packetId);
   },
 
@@ -1126,13 +1205,11 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       return;
     }
 
-    // Check if we know the MAC address of the target
     let destMAC = state.arpTables[fromDeviceId]?.[targetIp];
     const vlanId = fromDevice.ports[0]?.isVlanEnabled
       ? fromDevice.ports[0].accessVlan
       : undefined;
 
-    // If MAC is not known, initiate ARP request
     if (!destMAC) {
       console.log(
         `[PING] MAC address of ${targetIp} unknown, creating ARP request from ${fromDeviceId}`
@@ -1163,13 +1240,10 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       };
       get().addPacket(arpPacket);
 
-      // Wait for ARP reply or for the ARP request to be removed (e.g., due to TTL or loop)
-
       let arpResolved = false;
       const arpPacketId = arpPacket.id;
       let macAppearedAt: number | null = null;
-      // let arpRequestGoneAt: number | null = null;
-      const maxWait = 30000; // максимум 30 секунд ожидания
+      const maxWait = 30000; 
 
       const startTime = Date.now();
       while (!arpResolved) {
@@ -1216,7 +1290,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       }
     }
 
-    // Create PING-REQUEST without starting simulation or sending
     const pingPacket: NetworkPacket = {
       id: `ping-${Date.now()}-${fromDeviceId}`,
       sourceDeviceId: fromDeviceId,
@@ -1241,7 +1314,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       visited: new Set<string>(),
       sentAt: Date.now(),
       isProcessed: false,
-      isPlaying: get().isSimulationRunning ? true : false, // <-- вот тут!
+      isPlaying: get().isSimulationRunning ? true : false, 
     };
     get().addPacket(pingPacket);
     if (!get().isSimulationRunning) {
@@ -1263,12 +1336,11 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       return;
     }
 
-    // Process each packet in parallel
     await Promise.all(
       packets.map(async (packet) => {
         const currentHop = packet.path[packet.currentHop];
         if (currentHop) {
-          get().updatePacket(packet.id, { isPlaying: true }); // Запускаем анимацию
+          get().updatePacket(packet.id, { isPlaying: true }); 
           await get().processPacket(
             packet.id,
             currentHop.deviceId,
@@ -1278,7 +1350,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       })
     );
 
-    // Next tick after 1500 ms
     setTimeout(() => {
       get().tickSimulation();
     }, 1500);
@@ -1380,7 +1451,16 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       notifications: state.notifications.filter((n) => n.id !== id),
     })),
   clearNotifications: () => set({ notifications: [] }),
+  logs: [],
+  addLog: (message: string) =>
+    set((state) => ({
+      logs: [...state.logs, `[${new Date().toLocaleTimeString()}] ${message}`],
+    })),
+  clearLogs: () => set({ logs: [] }),
 }));
+const originalConsoleLog = console.log;
+const originalConsoleWarn = console.warn;
+const originalConsoleError = console.error;
 
 function getPortVlan(port: Port): number | undefined {
   if (port.isVlanEnabled) {

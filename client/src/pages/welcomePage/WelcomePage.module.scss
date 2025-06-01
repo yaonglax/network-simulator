@@ -26,7 +26,7 @@ body {
     justify-content: center;
     height: 100%;
     position: relative;
-    z-index: 2; /* Текст поверх Canvas */
+    z-index: 2;
     &-title {
       font-family: "ArchivoBlack";
       font-size: 40px;
@@ -40,16 +40,15 @@ body {
       margin-bottom: 20px;
     }
     &-btn {
-      width: 160px;
-      height: 70px;
-      background-color: var(--element-gray) !important;
-      border-radius: 17px !important;
+      width: 140px;
+      height: 50px;
+      background-color: transparent !important;
+      border-radius: 10px !important;
       color: var(--text-gray) !important;
       font-size: 21px !important;
       &:hover {
         background-color: rgba(92, 75, 140, 0.5) !important;
         border: 1px solid var(--highlight-purple);
-        box-shadow: 1px 1px 8px var(--highlight-purple);
       }
     }
   }

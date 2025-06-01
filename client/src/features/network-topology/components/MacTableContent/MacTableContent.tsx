@@ -13,7 +13,6 @@ const MacTableContent = ({ device }: { device: Device }) => {
     const { macTables } = useNetworkStore();
     const [switchMacTable, setSwitchMacTable] = useState<MacTableRecord[]>([]);
 
-    // Проверка, что устройство - это коммутатор
     if (device.type !== "switch") {
         return <Typography>MAC-таблица доступна только для коммутаторов</Typography>;
     }

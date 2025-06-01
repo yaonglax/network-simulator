@@ -28,6 +28,7 @@ export const ContextMenuPopover = ({ device, anchorEl, setAnchorEl }: PortsModal
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const updateDevice = useNetworkStore((state) => state.updateDevice);
     const removeDevice = useNetworkStore((state) => state.removeDevice)
+    const isSimulationRunning = useNetworkStore((state) => state.isSimulationRunning);
 
     const handleDeviceSave = (updates: Partial<Device>) => {
         if (device !== null)
@@ -68,7 +69,7 @@ export const ContextMenuPopover = ({ device, anchorEl, setAnchorEl }: PortsModal
                 return (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <Typography>Вы уверены, что хотите удалить устройство?</Typography>
-                        <Button variant="contained" color="error" onClick={handleDeleteConfirm}>
+                        <Button variant="contained" color="error" onClick={handleDeleteConfirm} disabled={isSimulationRunning}>
                             Удалить
                         </Button>
                         <Button onClick={() => {

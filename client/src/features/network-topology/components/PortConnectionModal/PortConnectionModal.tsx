@@ -21,7 +21,7 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
     onClose,
     onConnect
 }) => {
-    // Получаем устройства из стора по id — всегда актуальные!
+    // Получаем устройства из стора по id
     const startDevice = useNetworkStore(state => state.devices[deviceIdStart]);
     const endDevice = useNetworkStore(state => state.devices[deviceIdEnd]);
     const connectPorts = useNetworkStore(state => state.connectPorts);
@@ -29,7 +29,7 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
     const [selectedStartPort, setSelectedStartPort] = React.useState<string>('');
     const [selectedEndPort, setSelectedEndPort] = React.useState<string>('');
 
-    // Получаем свободные порты (те, у которых нет connectedTo)
+    // Получаем свободные порты 
     const getFreePorts = (device?: typeof startDevice): Port[] => {
         if (!device?.ports) return [];
         return device.ports.filter(port => !port.connectedTo);
@@ -173,7 +173,7 @@ const PortConnectionModal: React.FC<PortConnectionProps> = ({
                         fullWidth
                         displayEmpty
                         sx={{
-                            ...formStyles, 
+                            ...formStyles,
                             color: 'var(--text-gray)',
                             border: '1px solid var(--element-gray)',
                             '& .MuiSelect-icon': {

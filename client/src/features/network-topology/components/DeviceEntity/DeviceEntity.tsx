@@ -84,7 +84,6 @@ export const DeviceEntity: React.FC<DeviceEntityProps> = ({
         setIsDragging(false);
     };
 
-    // Новый обработчик для блокировки всплытия клика
     const handleMouseDown = (e: React.MouseEvent<HTMLElement>) => {
         if (!isDraggable) {
             e.preventDefault();
@@ -99,7 +98,7 @@ export const DeviceEntity: React.FC<DeviceEntityProps> = ({
             onDragEnd={isDraggable ? handleDragEnd : undefined}
             onContextMenu={handleContextMenu}
             onDoubleClick={handleDoubleClick}
-            onMouseDown={handleMouseDown} // <-- добавлено!
+            onMouseDown={handleMouseDown}
             sx={{
                 position: 'absolute',
                 left: device.x,

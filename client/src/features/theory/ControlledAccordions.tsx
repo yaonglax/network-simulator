@@ -19,7 +19,7 @@ interface AccordionSection {
 
 interface ControlledAccordionsProps {
   onTopicSelect?: (mdFile: string, anchor?: string) => void;
-  expandedIndex?: number | null; // Add expandedIndex prop
+  expandedIndex?: number | null;
 }
 
 export const accordionData: AccordionSection[] = [
@@ -123,7 +123,6 @@ export default function ControlledAccordions({ onTopicSelect, expandedIndex }: C
   };
 
   React.useEffect(() => {
-    // Update expanded state when expandedIndex changes
     setExpanded(expandedIndex != null ? `panel${expandedIndex}` : false);
   }, [expandedIndex]);
 

@@ -1,6 +1,5 @@
-
 import React, { useEffect, useMemo, useState } from 'react';
-import { Paper, Button, Typography } from '@mui/material';
+import { Paper, Typography, Tooltip, IconButton } from '@mui/material';
 import { useNetworkStore } from '../../store/network-store';
 import ModalWindow from '../ModalWindow/ModalWindow';
 import { DeviceEntity } from '../DeviceEntity/DeviceEntity';
@@ -9,11 +8,18 @@ import PortsPopover from '@/features/network-topology/components/ContextMenuPopo
 import PortConnectionModal from '@/features/network-topology/components/PortConnectionModal/PortConnectionModal';
 import PacketEntity from '../PacketEntity/PacketEntity';
 import StartButton from '../StartButton';
-import { SaveLoadControls } from '../SaveLoadControls/SaveLoadControls';
-import { Box, display } from '@mui/system';
+import { Box } from '@mui/system';
 import { willCreateLoop } from '../../utils/loopDetection';
 import { DevicesPanel } from '../DevicesPanel/DevicesPanel';
-import FloodNotification from '../FloodNotification'
+import FloodNotification from '../FloodNotification';
+import LogWindow from '../LogWindow';
+import MenuIcon from '@mui/icons-material/Menu';
+import SaveIcon from '@mui/icons-material/Save';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import LayersClearIcon from '@mui/icons-material/LayersClear';
+import ListIcon from '@mui/icons-material/List';
+import { Link } from 'react-router-dom';
 
 export const NetworkCanvas = () => {
     interface LineCoords {
@@ -28,6 +34,7 @@ export const NetworkCanvas = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isPortsModalOpen, setIsPortsModalOpen] = useState(false);
     const [isPortsConnModalOpen, setIsPortsConnModalOpen] = useState(false);
+    const [isLogWindowOpen, setIsLogWindowOpen] = useState(false);
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
     const [dropPosition, setDropPosition] = useState({ x: 0, y: 0 });
     const [deviceType, setDeviceType] = useState<DeviceType | null>(null);
@@ -56,7 +63,9 @@ export const NetworkCanvas = () => {
     const addDevice = useNetworkStore((state) => state.addDevice);
     const startSimulation = useNetworkStore((state) => state.startSimulation);
     const clearPackets = useNetworkStore((state) => state.clearPackets);
-    const clearTopology = useNetworkStore((state) => state.clearTopology)
+    const clearTopology = useNetworkStore((state) => state.clearTopology);
+    const logs = useNetworkStore((state) => state.logs);
+    const clearLogs = useNetworkStore((state) => state.clearLogs);
 
     const [isPlaying, setIsPlaying] = useState(isSimulationRunning);
 
@@ -64,7 +73,6 @@ export const NetworkCanvas = () => {
         const seenIds = new Set<string>();
         return Object.values(devices).filter((device) => {
             if (seenIds.has(device.id)) {
-                console.warn(`Duplicate device ID found: ${device.id}`);
                 return false;
             }
             seenIds.add(device.id);
@@ -87,24 +95,13 @@ export const NetworkCanvas = () => {
         setDeviceRects(rects);
     }, [uniqueDevices]);
 
-    useEffect(() => {
-        console.log('Devices:', Object.values(devices).map(device => ({
-            id: device.id,
-            name: device.name,
-            type: device.type,
-            ports: device.ports,
-
-        })));
-    }, [devices]);
-
     const connectionLines = useMemo(() => {
         return connections.map((conn) => {
             const fromDevice = devices[conn.from.deviceId];
             const toDevice = devices[conn.to.deviceId];
             if (!fromDevice || !toDevice) return null;
             const isActiveFlood = !!activeConnections[conn.id]?.floodCount;
-            // const stroke = isActiveFlood ? 'black' : '#3f51b5';
-            const stroke = '#3f51b5'
+            const stroke = '#3f51b5';
             return {
                 id: conn.id,
                 startX: fromDevice.x + 25,
@@ -123,12 +120,10 @@ export const NetworkCanvas = () => {
 
         const canvas = document.getElementById('network-canvas');
         if (!canvas) {
-            console.error('Canvas not found');
             return;
         }
 
         const bounds = canvas.getBoundingClientRect();
-        // Вычисляем координаты относительно начала Paper
         const x = e.clientX - bounds.left;
         const y = e.clientY - bounds.top;
         setDropPosition({ x, y });
@@ -165,6 +160,7 @@ export const NetworkCanvas = () => {
             }));
         }
     };
+
     const isDevicesAlreadyConnected = (deviceAId: string, deviceBId: string): boolean => {
         return connections.some(
             (conn) =>
@@ -172,7 +168,6 @@ export const NetworkCanvas = () => {
                 (conn.from.deviceId === deviceBId && conn.to.deviceId === deviceAId)
         );
     };
-
 
     const handleDoubleClick = (e: React.MouseEvent<HTMLElement>, device: Device) => {
         e.preventDefault();
@@ -334,13 +329,145 @@ export const NetworkCanvas = () => {
         }
     };
 
+    const handleClearPackets = () => {
+        clearPackets();
+    };
+
+    const handleClearTopology = () => {
+        clearTopology();
+        clearPackets();
+    };
+
+    const handleToggleLogWindow = () => {
+        setIsLogWindowOpen((prev) => !prev);
+    };
+
     return (
         <>
-            <Typography variant='h5' color='white' fontWeight={700} margin='15px' textAlign={'right'}>NETSIM</Typography>
-            <StartButton
-                isPlaying={isPlaying}
-                onToggle={handleToggleSimulation}
-            />
+            {/* Фиксированный navbar */}
+            <Box
+                id="navbar"
+                sx={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '60px',
+                    backgroundColor: 'var(--bg-dark-gray)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0 20px',
+                    zIndex: 1100,
+                    borderBottom: '1px solid var(--detail-gray)',
+                }}
+            >
+                <Typography variant="h5" color="white" fontWeight={700}>
+                    NETSIM
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Tooltip title="Вернуться к теории">
+                        <Link to="/theory">
+                            <IconButton
+                                sx={{
+                                    color: 'white',
+                                    marginRight: '10px',
+                                    '&:hover': {
+                                        color: 'var(--highlight-purple)',
+                                        transition: 'color 0.3s ease',
+                                    },
+                                }}
+                            >
+                                <MenuIcon />
+                            </IconButton>
+                        </Link>
+                    </Tooltip>
+                    <Tooltip title="Загрузить файл">
+                        <IconButton
+                            onClick={async () => {
+                                const { handleLoad } = await import('../SaveLoadControls/SaveLoadControls');
+                                handleLoad();
+                            }}
+                            sx={{
+                                color: 'white',
+                                marginRight: '10px',
+                                '&:hover': {
+                                    color: 'var(--highlight-purple)',
+                                    transition: 'color 0.3s ease',
+                                },
+                            }}
+                        >
+                            <UploadFileIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Сохранить файл">
+                        <IconButton
+                            onClick={async () => {
+                                const { handleSave } = await import('../SaveLoadControls/SaveLoadControls');
+                                handleSave();
+                            }}
+                            sx={{
+                                color: 'white',
+                                marginRight: '10px',
+                                '&:hover': {
+                                    color: 'var(--highlight-purple)',
+                                    transition: 'color 0.3s ease',
+                                },
+                            }}
+                        >
+                            <SaveIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Очистить пакеты">
+                        <IconButton
+                            onClick={handleClearPackets}
+                            disabled={isSimulationRunning}
+                            sx={{
+                                color: 'white',
+                                marginRight: '10px',
+                                '&:hover': {
+                                    color: 'var(--highlight-purple)',
+                                    transition: 'color 0.3s ease',
+                                },
+                            }}
+                        >
+                            <DeleteSweepIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Очистить топологию">
+                        <IconButton
+                            onClick={handleClearTopology}
+                            disabled={isSimulationRunning}
+                            sx={{
+                                color: 'white',
+                                marginRight: '10px',
+                                '&:hover': {
+                                    color: 'var(--highlight-purple)',
+                                    transition: 'color 0.3s ease',
+                                },
+                            }}
+                        >
+                            <LayersClearIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title={isLogWindowOpen ? 'Скрыть логи' : 'Показать логи'}>
+                        <IconButton
+                            onClick={handleToggleLogWindow}
+                            sx={{
+                                color: 'white',
+                                marginRight: '10px',
+                                '&:hover': {
+                                    color: 'var(--highlight-purple)',
+                                    transition: 'color 0.3s ease',
+                                },
+                            }}
+                        >
+                            <ListIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <StartButton isPlaying={isPlaying} onToggle={handleToggleSimulation} />
+                </Box>
+            </Box>
             <Paper
                 id="network-canvas"
                 onDrop={handleDrop}
@@ -357,7 +484,8 @@ export const NetworkCanvas = () => {
                     overflow: 'hidden',
                     zIndex: 1,
                     width: '95%',
-                    marginLeft: '60px'
+                    marginLeft: '60px',
+                    marginTop: '80px',
                 }}
             >
                 <svg
@@ -433,12 +561,8 @@ export const NetworkCanvas = () => {
                 />
                 {selectedStartDevice && selectedEndDevice && (
                     <PortConnectionModal
-                        onClose={() => {
-                            setIsPortsConnModalOpen(false);
-                        }}
-                        onConnect={() => {
-                            handlePortsConnected();
-                        }}
+                        onClose={() => setIsPortsConnModalOpen(false)}
+                        onConnect={handlePortsConnected}
                         open={isPortsConnModalOpen}
                         deviceIdStart={selectedStartDevice.id}
                         deviceIdEnd={selectedEndDevice.id}
@@ -454,51 +578,10 @@ export const NetworkCanvas = () => {
                 ))}
                 <DevicesPanel />
                 <FloodNotification />
-
             </Paper>
-            <Box display='flex' flexDirection='row' justifyContent='flex-end' padding='10px 15px'>
-                <SaveLoadControls />
-
-                <Button
-                    variant="contained"
-                    onClick={() => clearPackets()}
-                    sx={{
-                        backgroundColor: 'var(--accent-purple)',
-                        color: 'var(--contrast-white)',
-                        minWidth: '20px',
-                        minHeight: '12px',
-                        width: '180px',
-                        height: '50px',
-                        borderRadius: '0.5rem',
-                        '&:hover': { bgcolor: 'var(--hover-purple)', border: '1px solid var(--highlight-purple)', boxShadow: '0px 0px 1px var(--highlight-purple)' },
-                        zIndex: 1000,
-                        marginLeft: '8px'
-                    }}
-                >
-                    Очистить пакеты
-                </Button>
-                <Button
-                    variant="contained"
-                    onClick={() => {
-                        clearTopology();
-                        clearPackets()
-                    }}
-                    sx={{
-                        backgroundColor: 'var(--accent-purple)',
-                        color: 'var(--contrast-white)',
-                        minWidth: '20px',
-                        minHeight: '12px',
-                        width: '180px',
-                        height: '50px',
-                        borderRadius: '0.5rem',
-                        '&:hover': { bgcolor: 'var(--hover-purple)', border: '1px solid var(--highlight-purple)', boxShadow: '0px 0px 1px var(--highlight-purple)' },
-                        zIndex: 1000,
-                        marginLeft: '8px'
-                    }}
-                >
-                    Очистить топологию
-                </Button>
-            </Box>
+            {isLogWindowOpen && (
+                <LogWindow logs={logs} onClose={() => setIsLogWindowOpen(false)} />
+            )}
         </>
     );
 };

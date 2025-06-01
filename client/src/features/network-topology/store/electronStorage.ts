@@ -28,7 +28,7 @@ declare global {
           type: DeviceType;
           network: string;
           portsCount?: number;
-          name?: string; // Сделали name опциональным
+          name?: string;
           ports?: Array<{
             type: PortType;
             name?: string;
@@ -112,17 +112,14 @@ export const electronStorage: PersistStorage<ProjectState> = {
 export const fileStorage = {
   saveNetworkState: async (data: NetworkFileData): Promise<string> => {
     try {
-      // Нормализуем данные перед сохранением
       let normalized: NetworkTopology;
 
       if ("addDevice" in data) {
-        // Это NetworkState - извлекаем нужные данные
         normalized = {
           devices: data.devices,
           connections: data.connections,
         };
       } else if ("id" in data) {
-        // Это NetworkProject - преобразуем devices в Record
         normalized = {
           devices: Object.values(data.devices).reduce((acc, device) => {
             acc[device.id] = device;
@@ -131,7 +128,6 @@ export const fileStorage = {
           connections: data.connections,
         };
       } else {
-        // Это уже NetworkTopology
         normalized = data;
       }
 
@@ -153,8 +149,6 @@ export const fileStorage = {
 
       const parsed = JSON.parse(data);
       console.log("Parsed file content:", parsed);
-
-      // 1. Нормализация устройств с явным указанием типа
       const devices: Record<string, Device> = Array.isArray(parsed.devices)
         ? parsed.devices.reduce(
             (acc: Record<string, Device>, device: Device) => {
@@ -164,8 +158,6 @@ export const fileStorage = {
             {} as Record<string, Device>
           )
         : (parsed.devices as Record<string, Device>) || {};
-
-      // 2. Восстановление соединений из connectedTo с явными типами
       const connectionsFromPorts: Connection[] = [];
 
       (Object.values(devices) as Device[]).forEach((device: Device) => {
@@ -194,7 +186,6 @@ export const fileStorage = {
         }
       });
 
-      // 3. Объединение с существующими соединениями
       const existingConnections: Connection[] = Array.isArray(
         parsed.connections
       )
@@ -219,7 +210,6 @@ export const fileStorage = {
         ),
       ];
 
-      // 4. Логирование для проверки имён
       console.log(
         "Loaded devices:",
         Object.values(devices).map((d) => ({

@@ -2,7 +2,7 @@ import { TypeAnimation } from 'react-type-animation';
 import { Link } from 'react-router-dom';
 import { Button } from '@mui/material';
 import { useEffect, useRef } from 'react';
-import '../../styles/main.css';
+
 
 const WelcomePage = () => {
     const canvasRef = useRef(null);
@@ -10,100 +10,148 @@ const WelcomePage = () => {
     useEffect(() => {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
-        const centerX = canvas.width / 4; // Сдвигаем начальный квадрат влево
-        const centerY = canvas.height / 2;
-        const squareSize = 20; // Размер квадрата
-        const segmentLength = 30; // Длина сегмента ломаной линии
-        const maxSegments = 10; // Количество сегментов до появления второго квадрата
-        let phase = 'blink1'; // Фазы: 'blink1' (первый квадрат мигает), 'drawLine' (рисуем линию), 'blink2' (оба квадрата мигают), 'done' (конец)
-        let blinkTime = 0; // Время для мигания
-        let segments = []; // Массив точек ломаной линии
-        let currentSegment = 0; // Текущий сегмент
-        let currentX = centerX; // Текущая позиция конца линии
-        let currentY = centerY;
-        let direction = 0; // Направление: 0 (вправо), 1 (вниз), 2 (влево), 3 (вверх)
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
 
-        // Инициализируем начальную точку линии
-        segments.push({ x: centerX, y: centerY });
+        const squareSize = 10;
+        const segmentLength = 50;
+        const maxSegments = 15;
+        const groupCount = 3;
+        const linesPerGroup = 3;
+        const highlightPurple = getComputedStyle(document.documentElement).getPropertyValue('--accent-purple').trim();
+
+        const lines = [];
+        let time = 0;
+
+        // Инициализируем группы линий
+        for (let g = 0; g < groupCount; g++) {
+            const startX = Math.random() * width;
+            const startY = Math.random() * height;
+            for (let i = 0; i < linesPerGroup; i++) {
+                lines.push({
+                    segments: [{ x: startX, y: startY }],
+                    currentX: startX,
+                    currentY: startY,
+                    currentSegment: 0,
+                    direction: 0,
+                    phase: 'blink1',
+                    blinkTime: 0,
+                    fadeTime: 0,
+                });
+            }
+        }
 
         // Рисуем квадрат
         const drawSquare = (x, y, alpha) => {
             ctx.save();
-            ctx.globalAlpha = alpha;
-            ctx.fillStyle = '#FFFFFF';
+            ctx.globalAlpha = alpha * 0.7;
+            ctx.fillStyle = highlightPurple;
             ctx.fillRect(x - squareSize / 2, y - squareSize / 2, squareSize, squareSize);
             ctx.restore();
         };
 
-        // Рисуем ломаную линию
-        const drawLine = () => {
+        // Рисуем ломаную линию с затуханием
+        const drawLine = (segments, alpha) => {
             ctx.beginPath();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.strokeStyle = highlightPurple;
             ctx.lineWidth = 2;
             for (let i = 0; i < segments.length - 1; i++) {
+                const segmentAlpha = alpha * (1 - i / segments.length) * 0.5;
+                ctx.globalAlpha = segmentAlpha;
                 ctx.moveTo(segments[i].x, segments[i].y);
                 ctx.lineTo(segments[i + 1].x, segments[i + 1].y);
+                ctx.stroke();
             }
-            ctx.stroke();
+            ctx.globalAlpha = 1;
         };
 
-        // Генерируем следующую точку линии
-        const addSegment = () => {
-            // Выбираем случайное направление (0: вправо, 1: вниз, 2: влево, 3: вверх)
-            const directions = [0, 1, 2, 3].filter(d => Math.abs(d - direction) !== 2); // Исключаем противоположное направление
-            direction = directions[Math.floor(Math.random() * directions.length)];
-            let newX = currentX;
-            let newY = currentY;
+        // Генерируем следующий сегмент линии
+        const addSegment = (line) => {
+            const directions = [0, 1, 2, 3].filter(d => Math.abs(d - line.direction) !== 2);
+            line.direction = directions[Math.floor(Math.random() * directions.length)];
+            let newX = line.currentX;
+            let newY = line.currentY;
 
-            if (direction === 0) newX += segmentLength; // Вправо
-            else if (direction === 1) newY += segmentLength; // Вниз
-            else if (direction === 2) newX -= segmentLength; // Влево
-            else if (direction === 3) newY -= segmentLength; // Вверх
+            if (line.direction === 0) newX += segmentLength;
+            else if (line.direction === 1) newY += segmentLength
+            else if (line.direction === 2) newX -= segmentLength;
+            else if (line.direction === 3) newY -= segmentLength;
 
-            segments.push({ x: newX, y: newY });
-            currentX = newX;
-            currentY = newY;
-            currentSegment++;
+            // Ограничиваем выход за пределы canvas
+            newX = Math.max(squareSize, Math.min(width - squareSize, newX));
+            newY = Math.max(squareSize, Math.min(height - squareSize, newY));
+
+            line.segments.push({ x: newX, y: newY });
+            line.currentX = newX;
+            line.currentY = newY;
+            line.currentSegment++;
         };
 
         // Анимация
         const animate = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            blinkTime += 0.1;
+            ctx.clearRect(0, 0, width, height);
+            time += 0.1;
 
-            if (phase === 'blink1') {
-                // Первый квадрат мигает
-                const alpha = 0.5 + 0.5 * Math.sin(blinkTime); // Прозрачность от 0.5 до 1
-                drawSquare(centerX, centerY, alpha);
-                if (blinkTime > 6) { // Мигаем ~2 секунды (6 радиан)
-                    phase = 'drawLine';
-                    blinkTime = 0;
-                }
-            } else if (phase === 'drawLine') {
-                // Рисуем первый квадрат (без мигания) и линию
-                drawSquare(centerX, centerY, 1);
-                if (currentSegment < maxSegments) {
-                    if (blinkTime > 0.5) { // Добавляем сегмент каждые ~0.5 секунды
-                        addSegment();
-                        blinkTime = 0;
+            lines.forEach((line) => {
+                if (line.phase === 'done') return;
+
+                line.blinkTime += 0.1;
+
+                if (line.phase === 'blink1') {
+                    const alpha = 0.3 + 0.6 * Math.sin(line.blinkTime * 4);
+                    drawSquare(line.segments[0].x, line.segments[0].y, alpha);
+                    if (line.blinkTime > 6) {
+                        line.phase = 'drawLine';
+                        line.blinkTime = 0;
                     }
-                } else {
-                    phase = 'blink2';
-                    blinkTime = 0;
+                } else if (line.phase === 'drawLine') {
+                    // Построение линии с начальным квадратом
+                    drawSquare(line.segments[0].x, line.segments[0].y, 0.7);
+                    if (line.currentSegment < maxSegments) {
+                        if (line.blinkTime > 0.5) {
+                            addSegment(line);
+                            line.blinkTime = 0;
+                        }
+                    } else {
+                        line.phase = 'fadeOut';
+                        line.blinkTime = 0;
+                        line.fadeTime = 0;
+                    }
+                    drawLine(line.segments, 0.5); // Базовая прозрачность линии
+                } else if (line.phase === 'fadeOut') {
+                    // Затухание линии и квадрата
+                    line.fadeTime += 0.1;
+                    const fadeAlpha = Math.max(0, 0.7 - line.fadeTime * 0.1); // Постепенное затухание от 0.7 до 0
+                    if (fadeAlpha > 0) {
+                        drawSquare(line.segments[0].x, line.segments[0].y, fadeAlpha);
+                        drawLine(line.segments, fadeAlpha * 0.5); // Линия затухает быстрее
+                    } else {
+                        line.phase = 'done';
+                    }
                 }
-                drawLine();
-            } else if (phase === 'blink2') {
-                // Оба квадрата мигают
-                const alpha = 0.5 + 0.5 * Math.sin(blinkTime); // Прозрачность от 0.5 до 1
-                drawSquare(centerX, centerY, alpha);
-                drawSquare(currentX, currentY, alpha);
-                drawLine();
-                if (blinkTime > 6) { // Мигаем ~2 секунды
-                    phase = 'done';
+            });
+
+            // Перезапуск анимации, если все линии завершены
+            if (lines.every(line => line.phase === 'done')) {
+                lines.length = 0;
+                for (let g = 0; g < groupCount; g++) {
+                    const startX = Math.random() * width;
+                    const startY = Math.random() * height;
+                    for (let i = 0; i < linesPerGroup; i++) {
+                        lines.push({
+                            segments: [{ x: startX, y: startY }],
+                            currentX: startX,
+                            currentY: startY,
+                            currentSegment: 0,
+                            direction: 0,
+                            phase: 'blink1',
+                            blinkTime: 0,
+                            fadeTime: 0,
+                        });
+                    }
                 }
-            } else if (phase === 'done') {
-                // Анимация завершена, ничего не рисуем
-                return;
             }
 
             requestAnimationFrame(animate);
@@ -130,7 +178,9 @@ const WelcomePage = () => {
                     />
                 </span>
                 <span className="welcomepage__wrapper-subtitle">Придумай, смоделируй, реализуй</span>
-                <Link to={'/theory'} style={{ textDecoration: 'none' }}>
+                <Link to={'/theory'} style={{
+                    textDecoration: 'none'
+                }}>
                     <Button className='welcomepage__wrapper-btn'>
                         Начать
                     </Button>

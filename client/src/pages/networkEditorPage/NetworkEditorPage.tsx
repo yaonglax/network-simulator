@@ -3,109 +3,21 @@ import { Box } from '@mui/material';
 import { NetworkCanvas } from '@/features/network-topology/components/NetworkCanvas/NetworkCanvas';
 import PersistentDrawerLeft from '@/features/theory/Drawer';
 import Joyride, { CallBackProps, STATUS, Step } from 'react-joyride';
-
-// Туторные шаги
-const networkEditorSteps: Step[] = [
-    {
-        target: 'body',
-        title: 'Добро пожаловать в редактор сети!',
-        content: (
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-                <img src="/cat4.svg" alt="Маскот" style={{ width: '50px', marginRight: '15px' }} />
-                <span>Это визуальный редактор топологии сети. Давайте познакомимся с его возможностями!</span>
-            </div>
-        ),
-        placement: 'center',
-        disableBeacon: true,
-    },
-    {
-        target: '.devices-panel-root',
-        title: 'Панель устройств',
-        content: (
-            <span>
-                Здесь находятся все доступные устройства. Перетащите нужное устройство на рабочее поле для добавления в топологию.
-            </span>
-        ),
-        placement: 'right',
-        disableBeacon: true,
-    },
-    {
-        target: '#network-canvas',
-        title: 'Рабочее поле',
-        content: (
-            <span>
-                Это основное поле для построения вашей сети. Сюда можно перетаскивать устройства, соединять их и запускать симуляцию.
-            </span>
-        ),
-        placement: 'center',
-        disableBeacon: true,
-    },
-    {
-        target: '#start-simulation-btn',
-        title: 'Кнопка запуска симуляции',
-        content: (
-            <span>
-                После построения топологии нажмите эту кнопку, чтобы запустить симуляцию передачи пакетов.
-            </span>
-        ),
-        placement: 'bottom',
-        disableBeacon: true,
-    },
-    {
-        target: '.save-load-controls-root',
-        title: 'Сохранение и загрузка',
-        content: (
-            <span>
-                Здесь вы можете сохранить текущую топологию или загрузить ранее сохранённую.
-            </span>
-        ),
-        placement: 'top',
-        disableBeacon: true,
-    },
-    {
-        target: '#network-canvas',
-        title: 'Соединение устройств и контекстное меню',
-        content: (
-            <div>
-                <div style={{ marginBottom: 8 }}>
-                    <b>Двойной клик</b> по устройству — активирует режим соединения устройств.
-                </div>
-                <div>
-                    <b>Правая кнопка мыши</b> по устройству — открывает контекстное меню для управления портами и настройками.
-                </div>
-            </div>
-        ),
-        placement: 'center',
-        disableBeacon: true,
-    },
-    {
-        target: 'body',
-        title: 'Удачи!',
-        content: (
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-                <img src="/cat4.svg" alt="Маскот" style={{ width: '50px', marginRight: '15px' }} />
-                <span>Желаем удачи в построении и исследовании компьютерных сетей!</span>
-            </div>
-        ),
-        placement: 'center',
-        disableBeacon: true,
-    },
-];
-
-const TOUR_KEY = 'networkEditorTourCompleted';
+import { tourSteps, GLOBAL_TOUR_KEY } from '@/features/theory/tourSteps';
 
 const NetworkEditorPage = () => {
     const [drawerOpen, setDrawerOpen] = useState(false);
-
-    // Joyride state
-    const [runTour, setRunTour] = useState(false); // по умолчанию не запускать
+    const [runTour, setRunTour] = useState(false);
     const [stepIndex, setStepIndex] = useState(0);
 
-    // Проверяем localStorage при первом рендере
     useEffect(() => {
-        const completed = localStorage.getItem(TOUR_KEY);
-        if (!completed) {
+        const tourState = JSON.parse(localStorage.getItem(GLOBAL_TOUR_KEY) || '{}');
+        if (tourState.completed) {
+            setRunTour(false);
+            setStepIndex(0);
+        } else {
             setRunTour(true);
+            setStepIndex(tourState.stepIndex || 0);
         }
     }, []);
 
@@ -113,11 +25,13 @@ const NetworkEditorPage = () => {
         const { index, status, type } = data;
         if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
             setRunTour(false);
-            localStorage.setItem(TOUR_KEY, '1');
+            localStorage.setItem(GLOBAL_TOUR_KEY, JSON.stringify({ stepIndex: 0, completed: true }));
             return;
         }
         if (type === 'step:after' || type === 'error:target_not_found') {
-            setStepIndex(index + 1);
+            const newIndex = index + 1;
+            setStepIndex(newIndex);
+            localStorage.setItem(GLOBAL_TOUR_KEY, JSON.stringify({ stepIndex: newIndex, completed: false }));
             return;
         }
     };
@@ -132,7 +46,7 @@ const NetworkEditorPage = () => {
             }}
         >
             <Joyride
-                steps={networkEditorSteps}
+                steps={tourSteps}
                 run={runTour}
                 stepIndex={stepIndex}
                 continuous
@@ -198,15 +112,13 @@ const NetworkEditorPage = () => {
                 callback={handleJoyrideCallback}
                 disableOverlayClose
             />
-            <PersistentDrawerLeft
-                open={drawerOpen}
-                onToggle={() => setDrawerOpen((prev) => !prev)}
-            />
+
             <Box
                 component="main"
                 sx={{
                     height: '100vh',
                     width: '100%',
+                    marginTop: '60px',
                 }}
             >
                 <NetworkCanvas />

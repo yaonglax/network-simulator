@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 
-// Тип лог-сообщения
 export interface NetworkLogEntry {
     timestamp: number;
     type: string;
@@ -8,7 +7,6 @@ export interface NetworkLogEntry {
     details?: any;
 }
 
-// Контекст и провайдер
 const NetworkLoggerContext = createContext<{
     logs: NetworkLogEntry[];
     addLog: (entry: Omit<NetworkLogEntry, "timestamp">) => void;
@@ -40,7 +38,7 @@ export const useNetworkLogger = () => {
     return ctx;
 };
 
-// Компонент окна логов
+
 import { Dialog, DialogTitle, DialogContent, IconButton, Box, Typography, Button } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 

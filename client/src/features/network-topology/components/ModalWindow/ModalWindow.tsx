@@ -1,4 +1,3 @@
-// client/src/features/network-topology/components/ModalWindow.tsx
 import React, { useState, useEffect } from 'react';
 import {
     Dialog,
@@ -26,6 +25,9 @@ interface ModalWindowProps {
     deviceType: DeviceType | null;
 }
 
+const ipRegex = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}$/;
+const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+
 const ModalWindow: React.FC<ModalWindowProps> = ({
     modalOpen,
     onClose,
@@ -45,7 +47,6 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
             },
             '&.Mui-focused fieldset': {
                 borderColor: 'var(--highlight-purple)',
-
             },
         },
         '& .MuiInputLabel-root': {
@@ -73,6 +74,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
             },
         },
     };
+
     const [submitAttempted, setSubmitAttempted] = useState(false);
     const { devices } = useNetworkStore();
     const [isVlanEnabled, setIsVlanEnabled] = useState(false);
@@ -92,6 +94,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
             accessVlan?: number;
             isVlanEnabled?: boolean;
             allowedVlanList?: number[];
+            allowedVlanListRaw?: string;
             subnet_mask?: string;
             mac_address?: string;
             active?: boolean;
@@ -100,6 +103,8 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
     const [portNameErrors, setPortNameErrors] = useState<string[]>([]);
     const [portVlanErrors, setPortVlanErrors] = useState<string[]>([]);
     const [portAllowedVlanErrors, setPortAllowedVlanErrors] = useState<string[]>([]);
+    const [ipError, setIpError] = useState('');
+    const [macError, setMacError] = useState('');
 
     const validatePortNames = (newPorts: typeof ports) => {
         const errors = newPorts.map((port, index) => {
@@ -130,16 +135,23 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
     const validateAllowedVlanLists = (newPorts: typeof ports) => {
         const errors = newPorts.map((port) => {
             if (port.isVlanEnabled && port.type === 'trunk') {
-                if (!port.allowedVlanList || port.allowedVlanList.length === 0) {
+                const rawInput = port.allowedVlanListRaw || port.allowedVlanList?.join(',') || '';
+                const vlanList = rawInput
+                    .split(',')
+                    .map((v: string) => Number(v.trim()))
+                    .filter((v: number) => !isNaN(v));
+
+                if (!vlanList || vlanList.length === 0) {
                     return 'Список разрешённых VLAN не может быть пустым';
                 }
-                if (port.allowedVlanList.some((vlan) => vlan < 1 || vlan > 4094)) {
+                if (vlanList.some((vlan) => vlan < 1 || vlan > 4094)) {
                     return 'VLAN IDs должны быть в диапазоне 1–4094';
                 }
-                const uniqueVlanList = new Set(port.allowedVlanList);
-                if (uniqueVlanList.size !== port.allowedVlanList.length) {
+                const uniqueVlanList = new Set(vlanList);
+                if (uniqueVlanList.size !== vlanList.length) {
                     return 'VLAN IDs должны быть уникальными';
                 }
+                port.allowedVlanList = vlanList;
             }
             return '';
         });
@@ -166,7 +178,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                     subnet_mask: p.subnet_mask,
                 })),
             };
-            console.log('Sending calculate-device request:', requestData); // Debugging
+            console.log('Sending calculate-device request:', requestData);
             const response = await window.electronAPI.backend.calculateDevice(requestData);
 
             if (response.status !== 'success' || !response.data) {
@@ -210,14 +222,10 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
     const handlePortChange = (index: number, field: string, value: any) => {
         const newPorts = [...ports];
         if (field === 'allowedVlanList') {
-            const input = value.replace(/[^0-9,]/g, '');
-            const vlanList = input
-                .split(',')
-                .map((v: string) => Number(v.trim()))
-                .filter((v: number) => !isNaN(v) && v >= 1 && v <= 4094);
+            console.log('Changing allowedVlanListRaw to:', value);
             newPorts[index] = {
                 ...newPorts[index],
-                allowedVlanList: vlanList.length > 0 ? vlanList : undefined,
+                allowedVlanListRaw: value,
             };
         } else {
             newPorts[index] = { ...newPorts[index], [field]: value };
@@ -244,7 +252,22 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
         e.preventDefault();
         setSubmitAttempted(true);
 
-        if (!validatePortNames(ports) || !validateVlanIds(ports) || !validateAllowedVlanLists(ports)) {
+        const finalPorts = ports.map((port) => {
+            if (port.isVlanEnabled && port.type === 'trunk' && port.allowedVlanListRaw) {
+                const vlanList = port.allowedVlanListRaw
+                    .split(',')
+                    .map((v: string) => Number(v.trim()))
+                    .filter((v: number) => !isNaN(v));
+                return {
+                    ...port,
+                    allowedVlanList: vlanList.length > 0 ? vlanList : undefined,
+                    allowedVlanListRaw: undefined,
+                };
+            }
+            return port;
+        });
+
+        if (!validatePortNames(finalPorts) || !validateVlanIds(finalPorts) || !validateAllowedVlanLists(finalPorts)) {
             alert('Пожалуйста, исправьте ошибки в настройках портов');
             return;
         }
@@ -257,10 +280,10 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                     return;
                 }
 
-                const updatedPorts = ports.map((port) => ({
+                const updatedPorts = finalPorts.map((port) => ({
                     ...port,
                     ip_address: formData.ip_address,
-                    name: port.name || `Port ${ports.indexOf(port) + 1}`,
+                    name: port.name || `Port ${finalPorts.indexOf(port) + 1}`,
                     type: port.type || 'access',
                     isVlanEnabled: port.isVlanEnabled,
                     accessVlan: port.isVlanEnabled && port.type === 'access' ? port.accessVlan : undefined,
@@ -284,7 +307,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
             } else {
                 onSubmit({
                     ...formData,
-                    ports: ports.map((port, index) => ({
+                    ports: finalPorts.map((port, index) => ({
                         ...port,
                         id: `eth${index}`,
                         name: port.name || `Port ${index + 1}`,
@@ -317,6 +340,8 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
             setPortNameErrors([]);
             setPortVlanErrors([]);
             setPortAllowedVlanErrors([]);
+            setIpError('');
+            setMacError('');
         }
     }, [modalOpen]);
 
@@ -347,7 +372,6 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
         if (!deviceType) return;
 
         const newPortCount = Number(e.target.value);
-        // Ограничиваем количество портов согласно DEVICE_PORT_CONFIG
         const minPorts = DEVICE_PORT_CONFIG[deviceType].minPorts;
         const maxPorts = DEVICE_PORT_CONFIG[deviceType].maxPorts;
         if (newPortCount < minPorts || newPortCount > maxPorts) {
@@ -382,6 +406,33 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
             validatePortNames(newPorts);
             validateVlanIds(newPorts);
             validateAllowedVlanLists(newPorts);
+        }
+    };
+
+    const handleIpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setFormData((prev) => ({ ...prev, ip_address: value }));
+        if (value && !ipRegex.test(value)) {
+            setIpError('Некорректный формат IP-адреса');
+        } else {
+            setIpError('');
+        }
+    };
+
+    const handleMacChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setFormData((prev) => ({ ...prev, mac_address: value }));
+        if (value && !macRegex.test(value)) {
+            setMacError('Некорректный формат MAC-адреса');
+        } else {
+            setMacError('');
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        console.log('Key pressed:', e.key, 'Code:', e.code);
+        if (e.key === ',' || e.code === 'Comma') {
+            console.log('Comma detected!');
         }
     };
 
@@ -422,7 +473,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                                 transition: 'all 0.2s ease',
                                 '&:hover': {
                                     backgroundColor: 'var(--hover-purple)',
-                                    color: 'var(--text-gray)'
+                                    color: 'var(--text-gray)',
                                 },
                             }}
                             startIcon={isCalculating ? <CircularProgress size={20} /> : null}
@@ -493,7 +544,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                                     label="Включить VLAN"
                                     sx={{ mt: 1 }}
                                 />
-                                {port.isVlanEnabled ?
+                                {port.isVlanEnabled && (
                                     <Select
                                         margin="dense"
                                         value={port.type ?? 'none'}
@@ -513,8 +564,7 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                                         <MenuItem value="access">Access</MenuItem>
                                         <MenuItem value="trunk">Trunk</MenuItem>
                                     </Select>
-                                    :
-                                    ''}
+                                )}
 
                                 {port.isVlanEnabled && port.type === 'access' && (
                                     <TextField
@@ -534,15 +584,26 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                                     <TextField
                                         margin="dense"
                                         label="Разрешённые VLAN"
-                                        value={port.allowedVlanList ? port.allowedVlanList.join(',') : ''}
-                                        onChange={(e) => handlePortChange(index, 'allowedVlanList', e.target.value)}
+                                        value={port.allowedVlanListRaw || port.allowedVlanList?.join(',') || ''}
+                                        onChange={(e) => {
+                                            const input = e.target.value;
+                                            console.log('Input value:', input);
+                                            handlePortChange(index, 'allowedVlanList', input);
+                                        }}
+                                        onKeyDown={handleKeyDown}
+                                        onPaste={(e) => {
+                                            const pasted = e.clipboardData.getData('text');
+                                            console.log('Pasted value:', pasted);
+                                            handlePortChange(index, 'allowedVlanList', pasted);
+                                        }}
                                         fullWidth
                                         required
                                         error={!!portAllowedVlanErrors[index]}
                                         helperText={
                                             portAllowedVlanErrors[index] || 'Введите VLAN IDs через запятую (например, 10,20,30)'
                                         }
-                                        inputProps={{ pattern: '[0-9,]*' }}
+                                        inputProps={{}}
+                                        sx={formStyles}
                                     />
                                 )}
                             </Box>
@@ -557,15 +618,10 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                                 label="IP-адрес хоста"
                                 fullWidth
                                 value={formData.ip_address}
-                                onChange={handleChange}
+                                onChange={handleIpChange}
                                 required
-                                error={submitAttempted && !formData.ip_address}
-                                helperText={
-                                    (submitAttempted && !formData.ip_address
-                                        ? 'IP-адрес обязателен'
-                                        : 'Этот IP-адрес будет назначен всем портам хоста.'
-                                    )
-                                }
+                                error={!!ipError}
+                                helperText={ipError || 'Этот IP-адрес будет назначен всем портам хоста.'}
                                 sx={{ mt: 2, ...formStyles }}
                             />
                             <TextField
@@ -574,10 +630,10 @@ const ModalWindow: React.FC<ModalWindowProps> = ({
                                 label="MAC-адрес"
                                 fullWidth
                                 value={formData.mac_address}
-                                onChange={handleChange}
+                                onChange={handleMacChange}
                                 required
-                                error={submitAttempted && !formData.mac_address}
-                                helperText={submitAttempted && !formData.mac_address ? 'MAC-адрес обязателен' : ''}
+                                error={!!macError}
+                                helperText={macError || ''}
                                 sx={{ mt: 2, ...formStyles }}
                             />
                             <TextField

@@ -1,4 +1,3 @@
-@charset "UTF-8";
 body {
   background-color: var(--bg-dark-gray);
   color: var(--text-gray);
@@ -26,7 +25,7 @@ body {
   justify-content: center;
   height: 100%;
   position: relative;
-  z-index: 2; /* Текст поверх Canvas */
+  z-index: 2;
 }
 .welcomepage__wrapper-title {
   font-family: "ArchivoBlack";
@@ -41,15 +40,14 @@ body {
   margin-bottom: 20px;
 }
 .welcomepage__wrapper-btn {
-  width: 160px;
-  height: 70px;
-  background-color: var(--element-gray) !important;
-  border-radius: 17px !important;
+  width: 140px;
+  height: 50px;
+  background-color: transparent !important;
+  border-radius: 10px !important;
   color: var(--text-gray) !important;
   font-size: 21px !important;
 }
 .welcomepage__wrapper-btn:hover {
   background-color: rgba(92, 75, 140, 0.5) !important;
   border: 1px solid var(--highlight-purple);
-  box-shadow: 1px 1px 8px var(--highlight-purple);
 }/*# sourceMappingURL=WelcomePage.module.css.map */
