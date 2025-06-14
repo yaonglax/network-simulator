@@ -31,19 +31,29 @@ export default defineConfig({
     build: {
       outDir: "out/renderer", // Выходная директория для renderer
       emptyOutDir: true,
-      sourcemap: true,
-      minify: false,
-      rollupOptions: {
-        input: "/index.html",
-        output: {
-          manualChunks(id) {
-            if (id.includes("node_modules")) {
-              if (id.includes("@mui")) return "vendor-mui";
-              if (id.includes("react")) return "vendor-react";
-              return "vendor";
-            }
-          },
+      sourcemap: false,
+      minify: "terser",
+      terserOptions: {
+        compress: {
+          keep_fnames: true,
+          keep_classnames: true,
+          unused: false,
         },
+        mangle: {
+          keep_fnames: true,
+        },
+      },
+      rollupOptions: {
+        input: path.join(__dirname, "src/index.html"),
+        // output: {
+        //   manualChunks(id) {
+        //     if (id.includes("node_modules")) {
+        //       if (id.includes("@mui")) return "vendor-mui";
+        //       if (id.includes("react")) return "vendor-react";
+        //       return "vendor";
+        //     }
+        //   },
+        // },
       },
       chunkSizeWarningLimit: 1500,
     },
@@ -51,7 +61,7 @@ export default defineConfig({
       react({
         jsxImportSource: "@emotion/react",
         babel: {
-          plugins: ["@emotion/babel-plugin"],
+          plugins: [],
         },
       }),
     ],
@@ -66,7 +76,6 @@ export default defineConfig({
         "react",
         "react-dom",
       ],
-      exclude: ["@babel/runtime"],
     },
   },
 });
