@@ -7,7 +7,7 @@ export const tourSteps: Step[] = [
         title: 'Добро пожаловать!',
         content: (
             <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-                <img src="/cat1.png" alt="Маскот" style={{ width: '140px', position: 'absolute', bottom: '75%', left: '-30%', rotate: '-15deg' }} />
+                <img src="./cat1.png" alt="Маскот" style={{ width: '140px', position: 'absolute', bottom: '75%', left: '-30%', rotate: '-15deg' }} />
                 <span>Это обучающий тур по интерфейсу теории. Нажмите "Далее", чтобы начать!</span>
             </div>
         ),
@@ -47,7 +47,7 @@ export const tourSteps: Step[] = [
         title: 'Добро пожаловать в редактор сети!',
         content: (
             <div style={{ display: 'flex', alignItems: 'center' }}>
-                <img src="/cat1.svg" alt="Маскот" style={{ width: '50px', marginRight: '15px' }} />
+                <img src="./cat1.svg" alt="Маскот" style={{ width: '50px', marginRight: '15px' }} />
                 <span>Это визуальный редактор топологии сети. Давайте познакомимся с его возможностями!</span>
             </div>
         ),
@@ -127,7 +127,7 @@ export const tourSteps: Step[] = [
         title: 'Удачи!',
         content: (
             <div style={{ display: 'flex', alignItems: 'center' }}>
-                <img src="/cat1.svg" alt="Маскот" style={{ width: '50px', marginRight: '15px' }} />
+                <img src="./cat1.svg" alt="Маскот" style={{ width: '50px', marginRight: '15px' }} />
                 <span>Желаем удачи в построении и исследовании компьютерных сетей!</span>
             </div>
         ),

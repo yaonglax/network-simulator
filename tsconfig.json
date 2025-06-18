@@ -16,5 +16,5 @@
       "@store/*": ["store/*"]
     }
   },
-  "include": ["src/renderer/**/*"]
+  "include": ["src/renderer/**/*", "src/main/network.cjs"]
 }

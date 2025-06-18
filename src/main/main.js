@@ -4,11 +4,7 @@ const path = require("path");
 const Store = require("electron-store").default;
 const fs = require("fs");
 const { dialog } = require("electron");
-const {
-  generateMac,
-  generateIp,
-  getGateway,
-} = require("../renderer/utils/network.cjs");
+const { generateMac, generateIp, getGateway } = require("./network.cjs");
 
 let mainWindow;
 const store = new Store();
@@ -16,7 +12,7 @@ const store = new Store();
 function createWindow() {
   mainWindow = new BrowserWindow({
     fullscreen: true,
-    icon: path.join(__dirname, "/public/cat1.png"),
+    icon: path.join(__dirname, "./public/cat1.png"),
     webPreferences: {
       sandbox: true,
       nodeIntegration: false,
@@ -31,7 +27,6 @@ function createWindow() {
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, "../../out/renderer/index.html"));
-    mainWindow.webContents.openDevTools();
   }
 }
 

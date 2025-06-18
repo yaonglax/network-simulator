@@ -5,9 +5,9 @@
 Компьютерная сеть — это система взаимосвязанных устройств (компьютеров, серверов, мобильных устройств и других), которые обмениваются данными через каналы связи. Сети позволяют передавать информацию, обеспечивать совместное использование ресурсов (например, файлов, принтеров) и предоставлять доступ к сервисам, таким как интернет или корпоративные приложения. Основная цель компьютерной сети — обеспечить эффективное взаимодействие между устройствами для выполнения различных задач.
 
 <div style="position: relative; display: flex; justify-content: center; flex-direction: column; align-items: center;  margin: 20px 0;">
-  <img width="60%" src="/theory/network.png" style="border-radius: 0.5rem;" />
+  <img width="60%" src="./theory/network.png" style="border-radius: 0.5rem;" />
     <div class='note' >На схеме выше показана простая локальная сеть: три компьютера (хоста) подключены к одному сетевому коммутатору (свитчу). Такой свитч обеспечивает обмен данными между всеми устройствами внутри сети, позволяя им взаимодействовать друг с другом и совместно использовать ресурсы.
-    <img src="/cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
+    <img src="./cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
     </div>
   
 </div>
@@ -26,9 +26,9 @@
  Сетевые устройства, такие как маршрутизаторы, коммутаторы, точки доступа и модемы, управляют трафиком данных в сети. Они направляют данные, усиливают сигналы или обеспечивают подключение к другим сетям, включая интернет.
 <div style="position: relative; display: flex; justify-content: center; flex-direction: column; align-items: center; margin: 20px 0;">
     <div class="note">Коммутатор (L2) передаёт данные по MAC-адресам в пределах одной сети, а маршрутизатор (L3) перенаправляет пакеты между разными сетями, используя IP-адреса. Например, коммутатор соединяет компьютеры в офисе, а роутер связывает их с интернетом.
-    <img src="/cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
+    <img src="./cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
     </div>
-  <img src="/theory/switch-router.jpg" style="width: 60%; margin-top: 25px; border-radius: 0.5rem;">
+  <img src="./theory/switch-router.jpg" style="width: 60%; margin-top: 25px; border-radius: 0.5rem;">
 </div>
 
 <h2 id="network-types">Классификация сетей</h2>

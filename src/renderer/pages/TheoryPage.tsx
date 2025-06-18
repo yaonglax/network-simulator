@@ -48,7 +48,7 @@ const defaultMarkdownContent = `
 <div style="position: relative; display: flex; justify-content: center; flex-direction: column; align-items: center; margin: 20px 0;">
   <div class="note">
     <strong>Совет:</strong> Используй стрелки внизу страницы, чтобы переходить между разделами.
-    <img src="/cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
+    <img src="./cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
   </div>
 </div>
 

@@ -23,7 +23,7 @@ const TheoryMarkdownViewer: React.FC<TheoryMarkdownViewerProps> = ({ mdFile, anc
         }
         setLoading(true);
         setError(null);
-        const url = `/theory/${mdFile}`;
+        const url = `./theory/${mdFile}`;
         fetch(url)
             .then(res => {
                 if (!res.ok) throw new Error('Файл не найден');

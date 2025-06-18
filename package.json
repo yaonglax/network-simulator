@@ -9,7 +9,8 @@
     "electron": "electron .",
     "pack": "npm run build && npm run electron",
     "clean:build": "rimraf client/dist",
-    "clean:full": "rimraf client/build node_modules package-lock.json"
+    "clean:full": "rimraf client/build node_modules package-lock.json",
+    "dist": "electron-builder"
   },
   "keywords": [],
   "author": "",
@@ -25,6 +26,7 @@
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
     "electron": "^35.1.5",
+    "electron-builder": "^26.0.12",
     "electron-vite": "^3.1.0",
     "eslint": "^9.22.0",
     "eslint-plugin-react-hooks": "^5.2.0",
@@ -46,7 +48,7 @@
     "@reactour/tour": "^3.8.0",
     "date-fns": "^4.1.0",
     "eastasianwidth": "^0.3.0",
-    "electron-store": "^10.0.1",
+    "electron-store": "^8.2.0",
     "framer-motion": "^12.9.7",
     "fs": "^0.0.1-security",
     "random-mac": "^0.0.5",
@@ -66,5 +68,15 @@
     "terser": "^5.39.0",
     "uuid": "^11.1.0",
     "zustand": "^5.0.4"
+  },
+  "build": {
+    "appId": "com.example.myapp",
+    "productName": "Network Simulator",
+    "icon": "build/icon.ico",
+    "win": {
+      "target": "nsis"
+    }
   }
+
+  
 }

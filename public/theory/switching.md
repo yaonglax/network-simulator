@@ -8,7 +8,7 @@
   <img width="60%" src="/theory/switching.png" style="border-radius: 0.5rem;" />
   <div class='note'>
     На схеме показан принцип коммутации: данные от компьютера A передаются через коммутатор напрямую к компьютеру C, минуя другие устройства в сети.
-    <img src="/cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
+    <img src="./cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
   </div>
 </div>
 
@@ -38,7 +38,7 @@
 <div style="position: relative; display: flex; justify-content: center; flex-direction: column; align-items: center; margin: 20px 0;">
   <div class="note">
     <strong>Ключевое отличие:</strong> L2-коммутация работает внутри одной сети, L3-коммутация связывает разные сети. Современные L3-коммутаторы сочетают обе функции.
-    <img src="/cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
+    <img src="./cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
   </div>
 </div>
 
@@ -84,7 +84,7 @@
 <div style="position: relative; display: flex; justify-content: center; flex-direction: column; align-items: center; margin: 20px 0;">
   <div class="note">
     <strong>Эволюция устройств:</strong> Хабы почти не используются, их заменили коммутаторы. Современные маршрутизаторы часто включают функции коммутатора, файрвола и точки доступа.
-    <img src="/cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
+    <img src="./cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
   </div>
   <img src="/theory/net-devices.jpg" style="width: 60%; margin-top: 25px; border-radius: 0.5rem;">
 </div>
@@ -117,7 +117,7 @@
   <img src="/theory/flooding.png" style="width: 60%; border-radius: 0.5rem;">
   <div class="note">
     <strong>Важно:</strong> Flooding — нормальное поведение для неизвестных MAC-адресов, но избыточный flooding может указывать на проблемы в сети (петли, атаки).
-    <img src="/cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
+    <img src="./cat4.svg" style="position: absolute; bottom: 0; right: 0; translate: 50% 50%; transform: rotate(30deg); width: 120px;">
   </div>
 </div>
 
