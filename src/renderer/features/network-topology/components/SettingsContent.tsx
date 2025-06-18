@@ -380,7 +380,7 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ device, onSave }) => 
                                     >
                                         <ListItemText
                                             primary={port.name}
-                                            secondary={`Type: ${port.type || "none"} | Active: ${port.active ? "Yes" : "No"} | Connected: ${port.connectedTo ? "Yes" : "No"
+                                            secondary={`Тип: ${port.type || "none"} | Активный: ${port.active ? "Да" : "Нет"} | Подключение: ${port.connectedTo ? "Да" : "Нет"
                                                 }`}
 
                                             sx={{
